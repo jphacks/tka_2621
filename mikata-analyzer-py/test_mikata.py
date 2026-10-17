@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from analyze import AnalysisFailed, analyze_video, build_prompt, extract_video_id
+from analyze import AnalysisFailed, analyze_video, build_prompt, extract_video_id, validate_api_key
 from check import check_result, parse_time
 from schema import JSON_SCHEMA
 
@@ -41,7 +41,8 @@ def test_bad_sample_is_detected():
     r = check_result(BAD, duration=120, video_id="vid")
     errors = "\n".join(r.errors)
     for pat in ["戻っています", "一致しません", "動画の長さ", "confidence が0〜1の範囲外", "explain が長すぎます",
-                "sugoi なのに expertWhy が空", "sugoi なのに sugoiType が none", "「実際との違い」(differs)がありません"]:
+                "sugoi なのに expertWhy が空", "sugoi なのに sugoiType が none", "「実際との違い」(differs)がありません",
+                "gist が空です", "gist が長すぎます"]:
         assert pat in errors, pat
     warnings = "\n".join(r.warnings)
     for pat in ["watchPoints は3つ", "basics は最大3つ", "同じです", "見落とし",
@@ -81,6 +82,13 @@ def test_missing_genre_is_warned():
     d = copy.deepcopy(GOOD)
     d["events"][0]["analogies"] = d["events"][0]["analogies"][:1]
     assert any("たとえが無いジャンル: fps" in w for w in check_result(d, duration=30).warnings)
+
+
+def test_gist_length_is_warned_before_it_is_an_error():
+    d = copy.deepcopy(GOOD)
+    d["events"][0]["gist"] = "あ" * 30
+    r = check_result(d, duration=30)
+    assert not r.errors and any("1行に収まりません" in w for w in r.warnings)
 
 
 def test_unknown_genre_is_format_error():
@@ -179,7 +187,7 @@ def test_all_attempts_fail_raises_with_last_result():
 
 def test_prompt_contains_key_instructions():
     p = build_prompt()
-    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "sugoi", "expertWhy", "differs", "rpg", "fps", "context"]:
+    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "gist", "sugoi", "expertWhy", "differs", "rpg", "fps", "context"]:
         assert k in p, k
 
 
@@ -213,3 +221,9 @@ def test_real_sdk_serializes_request_as_expected(monkeypatch):
     assert parts[0]["processing"]["start_offset"] == "0s"  # 区間は文字列
     assert body["response_format"]["mime_type"] == "application/json"
     assert body["response_format"]["schema"]["required"] == ["preview", "events"]
+
+
+def test_validate_api_key():
+    assert validate_api_key("AIzaSyA-1234567890abcdefghijklmnopqrstu") is None
+    assert "英数字以外" in validate_api_key("ここにキー")
+    assert "空白" in validate_api_key("AIza abc")

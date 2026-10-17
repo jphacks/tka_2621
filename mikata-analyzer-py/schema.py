@@ -5,6 +5,7 @@
 - 厳しい検証(文字数・時刻の整合・たとえの構造など)は check.py 側で行う。
 
 1場面の中身(新方向):
+  gist       動画の下の1行に出す一言(24字以内)
   explain    何が起きたか(ルールを知らない人向けの一言)
   context    ルールが絡んで一目で分かりにくいときだけの補足(不要なら空文字)
   sugoi      玄人が「おっ」と思う場面か
@@ -74,6 +75,10 @@ JSON_SCHEMA: dict = {
                         "type": "string",
                         "description": "映像で見えた事実だけの客観的な描写(40字以内)。検索にも使う",
                     },
+                    "gist": {
+                        "type": "string",
+                        "description": "動画の下の1行に出す、ひと目で読める一言(24字以内)。すごい場面は何がすごいかを、そうでなければ何が起きたかを",
+                    },
                     "explain": {
                         "type": "string",
                         "description": "サッカーのルールを知らない人向けに、何が起きたかを一言で(60字以内)",
@@ -129,7 +134,7 @@ JSON_SCHEMA: dict = {
                     },
                 },
                 "required": [
-                    "time", "seconds", "event", "scene", "explain", "context",
+                    "time", "seconds", "event", "scene", "gist", "explain", "context",
                     "sugoi", "sugoiType", "expertWhy", "analogies", "terms", "confidence",
                 ],
             },
@@ -163,6 +168,7 @@ class Event(_Strict):
         "penalty", "card", "substitution", "pass", "dribble", "tackle", "other",
     ]
     scene: str
+    gist: str
     explain: str
     context: str
     sugoi: bool

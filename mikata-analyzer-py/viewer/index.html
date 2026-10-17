@@ -9,6 +9,7 @@
 <style>
   :root {
     --turf: #14342b;
+    --turf-deep: #0d211b;
     --turf-soft: #1f4a3c;
     --chalk: #edf2ee;
     --paper: #ffffff;
@@ -17,7 +18,6 @@
     --line: #cdd8d0;
     --yellow: #f2c230;
     --yellow-ink: #3a2e00;
-    --alert: #a3241c;
     --font: "BIZ UDPGothic", "Yu Gothic UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
@@ -27,101 +27,106 @@
   button { cursor: pointer; }
   :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
 
-  .page { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; }
-  .top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-  .top h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
-  .genres { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px; }
-  .genres button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-weight: 700; color: var(--muted); }
-  .genres button[aria-pressed=true] { background: var(--turf); color: var(--chalk); }
-  .top select { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); max-width: 100%; }
+  .page { max-width: 1480px; margin: 0 auto; padding: 16px 24px 40px; }
+  .top { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .top h1 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 4px 14px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; color: var(--muted); }
+  .seg button[aria-pressed=true] { background: var(--turf); color: var(--chalk); }
+  .toggle { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 5px 14px; font-weight: 700; font-size: 0.92rem; color: var(--muted); }
+  .toggle[aria-pressed=true] { background: var(--turf); border-color: var(--turf); color: var(--chalk); }
+  .toggle[hidden] { display: none; }
+  .top select { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); max-width: 100%; }
 
-  .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-  @media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  /* 動画が主役。解説は動画の外側に置き、動画の上には何も重ねない(YouTubeの規約) */
+  .layout { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
-  /* 左: 動画と探す */
-  .stage { aspect-ratio: 16 / 9; background: #000; border-radius: 12px; overflow: hidden; }
+  .theater { padding: 14px; border-radius: 18px; background: var(--turf-deep); transition: box-shadow 450ms ease; }
+  /* すごい場面: 動画の外側を光らせる。周辺視野で気づけて、読まなくても分かる */
+  .theater.glow1 { box-shadow: 0 0 0 2px rgba(242,194,48,0.55), 0 0 26px 2px rgba(242,194,48,0.3); }
+  .theater.glow2 { box-shadow: 0 0 0 3px var(--yellow), 0 0 58px 8px rgba(242,194,48,0.55); }
+  .stage { aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
   .stage > * { width: 100%; height: 100%; border: 0; }
   .stage .placeholder { display: grid; place-content: center; gap: 6px; padding: 24px; text-align: center; background: var(--turf-soft); color: var(--chalk); }
   .stage .placeholder strong { font-size: 1.15rem; }
   .stage .placeholder span { color: #c5d6cc; font-size: 0.95rem; }
 
+  /* 動画の真下の1行。ここだけ見れば流れが分かる */
+  .strip { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 0 4px; min-height: 2.6rem; color: var(--chalk); }
+  .strip .when { flex: none; font-size: 0.85rem; color: #a9bfb3; font-variant-numeric: tabular-nums; min-width: 2.8em; }
+  .strip .kind { flex: none; }
+  .strip .gist { flex: 1; min-width: 0; margin: 0; font-size: 1.2rem; font-weight: 700; line-height: 1.4; }
+  .strip .gist.idle { font-weight: 400; color: #a9bfb3; font-size: 1rem; }
+  .strip .soon { flex: none; padding: 1px 10px; border-radius: 6px; border: 2px solid var(--yellow); color: var(--yellow); font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
+  .strip .wow { flex: none; padding: 1px 10px; border-radius: 6px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
+  .strip .fs { flex: none; border: 1px solid #3d5c50; background: transparent; color: #c5d6cc; border-radius: 8px; padding: 3px 12px; font-size: 0.85rem; }
+  .strip .fs[hidden] { display: none; }
+  .kind { display: inline-block; padding: 1px 10px; border-radius: 6px; background: #2c5a49; color: #e3efe8; font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
+  .theater:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; padding: 2vh 2vw; background: #0b1511; }
+  .theater:fullscreen .stage { aspect-ratio: auto; flex: 1; min-height: 0; }
+  @media (max-width: 560px) { .strip { flex-wrap: wrap; gap: 6px 10px; } .strip .gist { flex-basis: 100%; order: 5; } }
+  @media (prefers-reduced-motion: reduce) { .theater { transition: none; } }
+
   .notice { margin: 10px 0 0; padding: 10px 14px; border-radius: 8px; background: #fff3d1; color: var(--yellow-ink); font-size: 0.95rem; }
   .notice a { color: inherit; font-weight: 700; }
-
   .scrub { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 14px; background: var(--paper); border-radius: 10px; border: 1px solid var(--line); }
   .scrub[hidden] { display: none; }
   .scrub button { padding: 6px 16px; border: 0; border-radius: 8px; background: var(--turf); color: var(--chalk); font-weight: 700; min-width: 4.5em; }
   .scrub input[type=range] { flex: 1; accent-color: var(--turf); }
   .scrub output { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; text-align: right; }
-  @media (max-width: 520px) { .scrub { gap: 8px; padding: 10px; } .scrub output { font-size: 0.85rem; } .log-head { flex-wrap: wrap; } }
+  .fine { margin: 14px 0 0; color: var(--muted); font-size: 0.85rem; }
 
-  .finder { margin-top: 22px; }
-  .finder h2, .log h2 { margin: 0 0 8px; font-size: 1rem; }
-  .finder input[type=search] { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: 1rem; }
-  .hits { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-  .hit { width: 100%; display: grid; grid-template-columns: 4.2em 1fr; gap: 10px; align-items: baseline; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
-  .hit:hover { border-color: var(--turf); }
-  .hit .t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--turf); }
-  .hit .s { color: var(--ink); }
-  .hit .s small { display: block; color: var(--muted); }
-  .finder .empty { margin: 10px 0 0; color: var(--muted); font-size: 0.95rem; }
-  .fine { margin: 18px 0 0; color: var(--muted); font-size: 0.85rem; }
+  /* 右: 控えめな詳細カード。読みたいときに読む */
+  .side > section + section { margin-top: 20px; }
+  .detail { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 20px; min-height: 180px; }
+  .detail.swap { animation: swap 240ms ease-out; }
+  @keyframes swap { from { opacity: 0.4; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .detail.swap { animation: none; } }
+  .detail h2 { margin: 0 0 10px; font-size: 1.05rem; }
+  .detail .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+  .detail .head .clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+  .detail .kind { background: #e6eee9; color: var(--turf); }
+  .detail .wow { padding: 1px 10px; border-radius: 6px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.85rem; }
+  .detail .soon { padding: 1px 10px; border-radius: 6px; border: 2px solid #c99a00; color: #8a6a00; font-weight: 700; font-size: 0.85rem; }
+  .detail .doubt { padding: 0 8px; border: 1px solid #b4781a; border-radius: 6px; font-size: 0.8rem; color: #8a5a00; }
+  .detail .explain { margin: 0; font-size: 1.1rem; font-weight: 600; line-height: 1.6; }
+  .detail .context { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: #eef3ef; font-size: 0.95rem; }
+  .detail .context b { color: var(--turf); margin-right: 6px; }
+  .detail .block { margin: 14px 0 0; padding-left: 12px; border-left: 4px solid var(--yellow); }
+  .detail .block .lab { margin: 0 0 2px; font-size: 0.85rem; font-weight: 700; color: #8a6a00; }
+  .detail .block p { margin: 0; font-size: 1rem; line-height: 1.65; }
+  .detail .block .differs { margin-top: 4px; font-size: 0.88rem; color: var(--muted); }
+  .detail .scene { margin: 12px 0 0; font-size: 0.85rem; color: var(--muted); }
+  .detail ul.pts { margin: 0 0 10px; padding-left: 1.2em; }
+  .detail ul.pts li { margin: 3px 0; }
+  .detail .sub { margin: 12px 0 4px; font-size: 0.88rem; color: var(--muted); font-weight: 700; }
 
-  /* 右: いまの解説 */
-  .now { background: var(--turf); color: var(--chalk); border-radius: 16px; padding: 26px 28px 28px; min-height: 260px; }
-  .now.swap { animation: swap 260ms ease-out; }
-  @keyframes swap { from { opacity: 0.25; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .now.swap { animation: none; } }
-
-  .now-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 14px; }
-  .kind, .wow, .doubt { white-space: nowrap; }
-  .kind { display: inline-block; padding: 2px 12px; border-radius: 6px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.95rem; }
-  .clock { font-variant-numeric: tabular-nums; font-size: 1.05rem; color: #b9cdc2; }
-  .now .explain { margin: 0; font-size: clamp(1.45rem, 2.4vw, 2rem); line-height: 1.5; font-weight: 700; }
-  .now .context { margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--turf-soft); font-size: 1rem; color: #e0eae4; }
-  .now .context b { color: var(--yellow); margin-right: 6px; }
-  .now .block { margin: 18px 0 0; padding-left: 14px; border-left: 4px solid var(--yellow); }
-  .now .block .lab { margin: 0 0 2px; font-size: 0.9rem; font-weight: 700; color: var(--yellow); }
-  .now .block p { margin: 0; font-size: 1.15rem; line-height: 1.65; color: #f2f6f3; }
-  .now .block .differs { margin-top: 6px; font-size: 0.92rem; color: #b9cdc2; }
-  .now .block .none-note { font-size: 0.95rem; color: #b9cdc2; }
-  .now.sugoi { box-shadow: 0 0 0 4px var(--yellow); }
-  .now.sugoi.swap { animation: pop 420ms ease-out; }
-  @keyframes pop { 0% { transform: scale(0.985); box-shadow: 0 0 0 0 var(--yellow); } 60% { transform: scale(1.0); box-shadow: 0 0 0 10px rgba(242,194,48,0.5); } 100% { box-shadow: 0 0 0 4px var(--yellow); } }
-  @media (prefers-reduced-motion: reduce) { .now.sugoi.swap { animation: none; } }
-  .wow { display: inline-block; padding: 2px 12px; border-radius: 6px; border: 2px solid var(--yellow); color: var(--yellow); font-weight: 700; font-size: 0.95rem; }
-  .now .scene { margin: 14px 0 0; font-size: 0.9rem; color: #a9bfb3; }
-  .doubt { display: inline-block; margin-left: 8px; padding: 0 8px; border: 1px solid currentColor; border-radius: 6px; font-size: 0.8rem; color: #ffd27a; }
-
-  .now h2 { margin: 0 0 12px; font-size: 1.3rem; }
-  .now ul { margin: 0 0 14px; padding-left: 1.3em; }
-  .now li { margin: 4px 0; font-size: 1.1rem; }
-  .now .sub { margin: 16px 0 6px; font-size: 0.95rem; color: #b9cdc2; font-weight: 700; }
-
-  .terms { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
-  .now .terms { padding-left: 0; }
-  .term { padding: 4px 12px; border-radius: 999px; border: 2px solid var(--yellow); background: transparent; color: var(--yellow); font-weight: 700; }
-  .term[aria-expanded=true] { background: var(--yellow); color: var(--yellow-ink); }
-  .meaning { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--turf-soft); font-size: 1rem; }
+  .terms { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+  .term { padding: 1px 10px; border-radius: 999px; border: 1.5px solid #c99a00; background: transparent; color: var(--yellow-ink); font-weight: 700; font-size: 0.88rem; }
+  .term[aria-expanded=true] { background: var(--yellow); }
+  .meaning { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; background: #f4f1e3; font-size: 0.92rem; }
   .meaning[hidden] { display: none; }
 
-  /* 右: ここまでの場面 */
-  .log { margin-top: 24px; }
-  .log-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .log-head label { font-size: 0.9rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
-  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .item { display: grid; grid-template-columns: 4.2em 1fr; gap: 10px; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  .finder h2, .log h2 { margin: 0 0 8px; font-size: 0.95rem; }
+  .finder input[type=search] { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: 0.95rem; }
+  .hits { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .hit { width: 100%; display: grid; grid-template-columns: 3.6em 1fr; gap: 8px; align-items: baseline; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: 0.92rem; }
+  .hit:hover { border-color: var(--turf); }
+  .hit .t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--turf); }
+  .hit .s small { display: block; color: var(--muted); }
+  .finder .empty { margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+  .log-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .log-head label { font-size: 0.85rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .item { display: grid; grid-template-columns: 3.6em 1fr; gap: 8px; padding: 9px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; font-size: 0.92rem; }
   .item.future { opacity: 0.55; }
   .item .t { align-self: start; padding: 0; border: 0; background: transparent; text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--turf); text-decoration: underline; text-underline-offset: 3px; }
-  .item .k { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
-  .item .e { margin: 2px 0 0; }
-  .item .w { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; }
-  .item .wow { margin-left: 8px; padding: 0 8px; font-size: 0.8rem; color: #8a6a00; border-color: #c99a00; }
-  .item .terms { margin-top: 8px; gap: 6px; }
-  .item .term { padding: 1px 10px; border-width: 1.5px; font-size: 0.88rem; color: var(--yellow-ink); border-color: #c99a00; }
-  .item .term[aria-expanded=true] { background: var(--yellow); }
-  .item .meaning { background: #f4f1e3; color: var(--ink); font-size: 0.92rem; }
+  .item .e { margin: 0; }
+  .item .w { margin: 2px 0 0; color: var(--muted); font-size: 0.85rem; }
+  .item .wow { margin-left: 6px; padding: 0 6px; border-radius: 5px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.75rem; }
   .none { color: var(--muted); }
 </style>
 </head>
@@ -130,40 +135,45 @@
   <header class="top">
     <h1>サッカー観戦ガイド（仮）</h1>
     <div class="controls">
-      <div class="genres" role="group" aria-label="たとえのジャンル" id="genres"></div>
+      <div class="seg" role="group" aria-label="たとえのジャンル" id="genres"></div>
+      <button type="button" class="toggle" id="audio" aria-pressed="false" hidden>音声ガイド</button>
       <select id="picker" aria-label="動画を選ぶ"></select>
     </div>
   </header>
 
   <main class="layout">
     <section aria-label="動画">
-      <div class="stage" id="stage"></div>
+      <div class="theater" id="theater">
+        <div class="stage" id="stage"></div>
+        <div class="strip" id="strip" aria-live="polite"></div>
+      </div>
       <p class="notice" id="notice" hidden></p>
       <div class="scrub" id="scrub" hidden>
         <button type="button" id="play">再生</button>
         <input type="range" id="seek" min="0" max="100" step="0.1" value="0" aria-label="再生位置">
         <output id="clock" for="seek">00:00 / 00:00</output>
       </div>
-
-      <div class="finder">
-        <h2>あの場面を探す</h2>
-        <input type="search" id="q" placeholder="覚えていることを書く（例: 左から上がったクロス、キーパーが止めた）" autocomplete="off">
-        <p class="empty" id="qmsg" hidden></p>
-        <ul class="hits" id="hits"></ul>
-      </div>
       <p class="fine">解説はAIが作ったもので、誤りを含むことがあります。</p>
     </section>
 
-    <section aria-label="解説">
-      <div class="now" id="now" aria-live="polite"></div>
-      <div class="log">
+    <aside class="side" aria-label="くわしい解説">
+      <section>
+        <div class="detail" id="detail"></div>
+      </section>
+      <section class="finder">
+        <h2>あの場面を探す</h2>
+        <input type="search" id="q" placeholder="覚えていることを書く（例: キーパーが止めた）" autocomplete="off">
+        <p class="empty" id="qmsg" hidden></p>
+        <ul class="hits" id="hits"></ul>
+      </section>
+      <section class="log">
         <div class="log-head">
           <h2>ここまでの場面</h2>
           <label><input type="checkbox" id="showAll"> これからの場面も表示（確認用）</label>
         </div>
         <ul class="items" id="items"></ul>
-      </div>
-    </section>
+      </section>
+    </aside>
   </main>
 </div>
 
@@ -176,7 +186,9 @@ const KIND = {
   substitution: "選手交代", pass: "パス", dribble: "ドリブル", tackle: "タックル", other: "その他",
 };
 const GENRE = { rpg: "RPG", fps: "FPS" };
-const LEAD = 0.3;        // 場面の少し手前から出す(秒)
+const LEAD = 0.3;          // 場面の少し手前から出す(秒)
+const SUGOI_LEAD = 3;      // すごい場面は、この秒数前から先出しする
+const GLOW_HOLD = 6;       // すごい場面のあと、光らせ続ける秒数
 const LOW_CONF = 0.6;
 
 const $ = (id) => document.getElementById(id);
@@ -195,8 +207,10 @@ const el = (tag, props = {}, ...kids) => {
 const S = {
   events: [], preview: null, meta: null, duration: 0,
   genre: "rpg",              // rpg | fps | none
-  mode: "timer",            // "yt" か "timer"
-  t: 0, playing: false, lastIdx: -2, showAll: false,
+  audio: false, spoken: new Set(),
+  mode: "timer",             // "yt" か "timer"
+  t: 0, playing: false, lastKey: "",
+  showAll: false,
   player: null, apiState: "loading",   // loading | ready | failed
 };
 
@@ -236,7 +250,7 @@ async function openVideo(id) {
   S.preview = j.data.preview || null;
   S.events = [...j.data.events].sort((a, b) => a.seconds - b.seconds);
   S.duration = Math.max(S.meta.duration || 0, (S.events.at(-1)?.seconds ?? 0) + 8);
-  S.t = 0; S.playing = false; S.lastIdx = -2;
+  S.t = 0; S.playing = false; S.lastKey = ""; S.spoken.clear(); stopSpeech();
   $("notice").hidden = true;
   $("q").value = ""; renderHits("");
 
@@ -301,21 +315,43 @@ setInterval(() => {
     $("seek").value = S.t;
   }
   if (S.mode === "timer") $("clock").textContent = fmt(S.t) + " / " + fmt(S.duration);
-  const idx = currentIndex();
-  if (idx !== S.lastIdx) render();
+  if (view().key !== S.lastKey) render();
 }, 200);
 
-const currentIndex = () => S.events.filter((e) => e.seconds <= S.t + LEAD).length;
+/* いまの状態をひとまとめにする。表示は全部これを見る */
+function view() {
+  const t = S.t;
+  const idx = S.events.filter((e) => e.seconds <= t + LEAD).length;
+  const cur = idx ? S.events[idx - 1] : null;
+  // すごい場面が近づいたら、先に出す(読んでから見られるように)
+  const next = S.events.find((e) => e.sugoi && e.seconds > t + LEAD && e.seconds - t <= SUGOI_LEAD) || null;
+  const justNow = !!(cur && cur.sugoi && t - cur.seconds <= GLOW_HOLD);
+  const glow = next ? 1 : justNow ? 2 : 0;
+  const focus = next || cur;
+  return { idx, cur, next, glow, focus, key: `${idx}|${next ? next.seconds : ""}|${glow}` };
+}
 
 function seekTo(sec) {
-  S.t = sec;
+  S.t = sec; S.spoken.clear(); stopSpeech();
   if (S.mode === "yt" && S.player && S.player.seekTo) { S.player.seekTo(sec, true); if (S.player.playVideo) S.player.playVideo(); }
   else { $("seek").value = sec; }
   render();
 }
 
+/* ---------- 音声ガイド ---------- */
+function stopSpeech() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) {} }
+function speak(text) {
+  if (!S.audio || !("speechSynthesis" in window) || !text) return;
+  try {
+    stopSpeech();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ja-JP"; u.rate = 1.05;
+    window.speechSynthesis.speak(u);
+  } catch (_) {}
+}
+
 /* ---------- 描画 ---------- */
-function termChips(terms, big) {
+function termChips(terms) {
   if (!terms || !terms.length) return null;
   const ul = el("ul", { class: "terms" });
   const box = el("p", { class: "meaning", hidden: true });
@@ -337,49 +373,69 @@ function termChips(terms, big) {
   return frag;
 }
 
-function renderNow(idx) {
-  const now = $("now");
-  now.replaceChildren();
-  now.classList.remove("swap"); void now.offsetWidth; now.classList.add("swap");
+function renderStrip(v) {
+  const strip = $("strip");
+  strip.replaceChildren();
+  const e = v.focus;
+  if (!e) {
+    strip.append(el("p", { class: "gist idle" }, "再生すると、ここに一言が出ます。"));
+  } else {
+    strip.append(
+      el("span", { class: "when" }, fmt(e.seconds)),
+      el("span", { class: "kind" }, KIND[e.event] || e.event),
+      el("p", { class: "gist" }, e.gist || e.explain),
+      v.next ? el("span", { class: "soon" }, "まもなく、すごい") : (e.sugoi ? el("span", { class: "wow" }, "ここ、すごい") : null),
+    );
+  }
+  const fs = el("button", { type: "button", class: "fs", onclick: toggleFullscreen }, "全画面");
+  if (!document.fullscreenEnabled) fs.hidden = true;
+  strip.append(fs);
+}
 
-  if (idx === 0) {
-    now.classList.remove("sugoi");
+function toggleFullscreen() {
+  const th = $("theater");
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (th.requestFullscreen) th.requestFullscreen();
+}
+
+function renderDetail(v) {
+  const box = $("detail");
+  box.replaceChildren();
+  box.classList.remove("swap"); void box.offsetWidth; box.classList.add("swap");
+
+  const e = v.focus;
+  if (!e) {
     const p = S.preview;
-    now.append(el("h2", {}, "見る前に"));
+    box.append(el("h2", {}, "見る前に"));
     if (p && p.watchPoints && p.watchPoints.length) {
-      now.append(el("p", { class: "sub" }, "注目するところ"), el("ul", {}, ...p.watchPoints.map((w) => el("li", {}, w))));
+      box.append(el("p", { class: "sub" }, "注目するところ"), el("ul", { class: "pts" }, ...p.watchPoints.map((w) => el("li", {}, w))));
     }
     if (p && p.basics && p.basics.length) {
-      now.append(el("p", { class: "sub" }, "知っておくと分かりやすいルール"), el("ul", {}, ...p.basics.map((w) => el("li", {}, w))));
+      box.append(el("p", { class: "sub" }, "知っておくと分かりやすいルール"), el("ul", { class: "pts" }, ...p.basics.map((w) => el("li", {}, w))));
     }
-    if (!p) now.append(el("p", { class: "none" }, "再生すると、ここに解説が出ます。"));
-    else now.append(el("p", { class: "sub" }, "再生すると、場面ごとの解説がここに出ます。"));
+    if (!p) box.append(el("p", { class: "none" }, "再生すると、ここに解説が出ます。"));
     return;
   }
-  const e = S.events[idx - 1];
-  const sugoi = !!e.sugoi;
-  now.classList.toggle("sugoi", sugoi);
-  const head = el("div", { class: "now-head" }, el("span", { class: "kind" }, KIND[e.event] || e.event), el("span", { class: "clock" }, fmt(e.seconds)));
-  if (sugoi) head.append(el("span", { class: "wow" }, "ここ、すごい場面"));
+  const head = el("div", { class: "head" }, el("span", { class: "kind" }, KIND[e.event] || e.event), el("span", { class: "clock" }, fmt(e.seconds)));
+  if (v.next) head.append(el("span", { class: "soon" }, "まもなく"));
+  else if (e.sugoi) head.append(el("span", { class: "wow" }, "ここ、すごい"));
   if (e.confidence < LOW_CONF) head.append(el("span", { class: "doubt" }, "自信低め"));
-  now.append(head, el("p", { class: "explain" }, e.explain));
-  if (e.context) now.append(el("p", { class: "context" }, el("b", {}, "ルール"), e.context));
-  if (sugoi) {
+  box.append(head, el("p", { class: "explain" }, e.explain));
+  if (e.context) box.append(el("p", { class: "context" }, el("b", {}, "ルール"), e.context));
+  if (e.sugoi) {
     const why = e.expertWhy || e.why;
-    if (why) now.append(el("div", { class: "block" }, el("p", { class: "lab" }, "経験者がすごいと思う理由"), el("p", {}, why)));
+    if (why) box.append(el("div", { class: "block" }, el("p", { class: "lab" }, "経験者がすごいと思う理由"), el("p", {}, why)));
     if (S.genre !== "none") {
       const a = (e.analogies || []).find((x) => x.genre === S.genre);
       const label = GENRE[S.genre] + "でいうと";
-      if (a) {
-        now.append(el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", {}, a.text), el("p", { class: "differs" }, "ちがうところ: " + a.differs)));
-      } else {
-        now.append(el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", { class: "none-note" }, "この場面は、うまく置き換えられませんでした。")));
-      }
+      box.append(a
+        ? el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", {}, a.text), el("p", { class: "differs" }, "ちがうところ: " + a.differs))
+        : el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", { class: "differs" }, "この場面は、うまく置き換えられませんでした。")));
     }
   }
-  if (e.scene) now.append(el("p", { class: "scene" }, "映像: " + e.scene));
-  const chips = termChips(e.terms, true);
-  if (chips) now.append(chips);
+  if (e.scene) box.append(el("p", { class: "scene" }, "映像: " + e.scene));
+  const chips = termChips(e.terms);
+  if (chips) box.append(chips);
 }
 
 function renderLog(idx) {
@@ -390,22 +446,30 @@ function renderLog(idx) {
   shown.sort((a, b) => b[0].seconds - a[0].seconds);
   if (!shown.length) { list.append(el("li", { class: "none" }, idx === 0 ? "まだ場面はありません。" : "これより前の場面はありません。")); return; }
   for (const [e, i] of shown) {
-    const body = el("div", {},
-      el("div", { class: "k" }, KIND[e.event] || e.event, e.sugoi ? el("span", { class: "wow" }, "すごい") : null),
-      el("p", { class: "e" }, e.explain),
-      (e.expertWhy || e.why) ? el("p", { class: "w" }, e.expertWhy || e.why) : null,
-      termChips(e.terms, false));
+    const why = e.expertWhy || e.why;
     list.append(el("li", { class: "item" + (i >= idx ? " future" : "") },
       el("button", { type: "button", class: "t", title: "この場面へ", onclick: () => seekTo(e.seconds) }, fmt(e.seconds)),
-      body));
+      el("div", {},
+        el("p", { class: "e" }, e.gist || e.explain, e.sugoi ? el("span", { class: "wow" }, "すごい") : null),
+        why ? el("p", { class: "w" }, why) : null)));
   }
 }
 
 function render() {
-  const idx = currentIndex();
-  S.lastIdx = idx;
-  renderNow(idx);
-  renderLog(idx);
+  const v = view();
+  S.lastKey = v.key;
+  const th = $("theater");
+  th.classList.toggle("glow1", v.glow === 1);
+  th.classList.toggle("glow2", v.glow === 2);
+  renderStrip(v);
+  renderDetail(v);
+  renderLog(v.idx);
+  // 音声ガイド: すごい場面を、先出しの時点で1回だけ読む
+  const e = v.focus;
+  if (e && e.sugoi && !S.spoken.has(e.seconds)) {
+    S.spoken.add(e.seconds);
+    speak([e.gist, e.expertWhy].filter(Boolean).join("。"));
+  }
 }
 
 /* ---------- 場面を探す ---------- */
@@ -422,7 +486,7 @@ function search(q) {
   if (!qg.size) return [];
   const res = [];
   for (const e of S.events) {
-    const doc = [e.scene, e.explain, e.context, e.expertWhy, e.why, KIND[e.event],
+    const doc = [e.scene, e.gist, e.explain, e.context, e.expertWhy, e.why, KIND[e.event],
       ...(e.analogies || []).map((a) => a.text), ...(e.terms || []).map((t) => t.term)].join("");
     const dg = grams(doc);
     let hit = 0;
@@ -441,7 +505,7 @@ function renderHits(q) {
   for (const { e } of r) {
     ul.append(el("li", {}, el("button", { type: "button", class: "hit", onclick: () => seekTo(e.seconds) },
       el("span", { class: "t" }, fmt(e.seconds)),
-      el("span", { class: "s" }, e.explain, el("small", {}, e.scene)))));
+      el("span", { class: "s" }, e.gist || e.explain, el("small", {}, e.scene)))));
   }
 }
 
@@ -450,30 +514,42 @@ async function init() {
   loadYouTubeApi();
   try { const g = localStorage.getItem("genre"); if (g === "none" || GENRE[g]) S.genre = g; } catch (_) {}
   const gbox = $("genres");
-  const gopts = [...Object.entries(GENRE), ["none", "たとえなし"]];
   const paintGenres = () => gbox.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.g === S.genre)));
-  for (const [g, label] of gopts) {
+  for (const [g, label] of [...Object.entries(GENRE), ["none", "たとえなし"]]) {
     gbox.append(el("button", { type: "button", "data-g": g, onclick: () => {
       S.genre = g; paintGenres(); render();
       try { localStorage.setItem("genre", g); } catch (_) {}
     } }, label));
   }
   paintGenres();
+
+  if ("speechSynthesis" in window) {
+    const a = $("audio");
+    a.hidden = false;
+    a.addEventListener("click", () => {
+      S.audio = !S.audio;
+      a.setAttribute("aria-pressed", String(S.audio));
+      a.textContent = S.audio ? "音声ガイド: オン" : "音声ガイド";
+      if (!S.audio) stopSpeech(); else { S.spoken.clear(); render(); }
+    });
+  }
+
   $("play").addEventListener("click", () => {
-    if (S.t >= S.duration) { S.t = 0; $("seek").value = 0; }
+    if (S.t >= S.duration) { S.t = 0; $("seek").value = 0; S.spoken.clear(); }
     S.playing = !S.playing;
     $("play").textContent = S.playing ? "停止" : "再生";
   });
-  $("seek").addEventListener("input", (ev) => { S.t = Number(ev.target.value); render(); });
+  $("seek").addEventListener("input", (ev) => { S.t = Number(ev.target.value); S.spoken.clear(); stopSpeech(); render(); });
   $("q").addEventListener("input", (ev) => renderHits(ev.target.value));
   $("showAll").addEventListener("change", (ev) => { S.showAll = ev.target.checked; render(); });
+  document.addEventListener("fullscreenchange", render);
 
   const res = await fetch("/api/videos");
   const vids = res.ok ? await res.json() : [];
   const picker = $("picker");
   if (!vids.length) {
     picker.hidden = true;
-    $("now").replaceChildren(el("h2", {}, "表示できる結果がありません"), el("p", {}, "python analyze.py で動画を解析すると、ここに表示されます。"));
+    $("detail").replaceChildren(el("h2", {}, "表示できる結果がありません"), el("p", {}, "python analyze.py で動画を解析すると、ここに表示されます。"));
     return;
   }
   for (const v of vids) {

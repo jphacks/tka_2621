@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from schema import GENRES, Result
 
 LIMITS = {
-    "scene": 50, "explain": 60, "explain_hard": 120, "context": 70, "context_hard": 140,
+    "scene": 50, "gist": 24, "gist_hard": 50, "explain": 60, "explain_hard": 120, "context": 70, "context_hard": 140,
     "expertWhy": 100, "expertWhy_hard": 200, "analogy": 90, "analogy_hard": 180, "differs": 60, "differs_hard": 120,
 }
 MAX_SUGOI_RATIO = 0.6  # すごい場面がこれを超えると、何でもすごいと言っている疑い
@@ -101,6 +101,12 @@ def check_result(data: dict, duration: float | None = None, video_id: str | None
             rep.errors.append(f"{tag} 動画の長さ({duration:g}秒)を超えています")
         prev = max(prev, e.seconds)
 
+        if not e.gist.strip():
+            rep.errors.append(f"{tag} gist が空です")
+        elif len(e.gist) > LIMITS["gist_hard"]:
+            rep.errors.append(f"{tag} gist が長すぎます({len(e.gist)}字)")
+        elif len(e.gist) > LIMITS["gist"]:
+            rep.warnings.append(f"{tag} gist が{LIMITS['gist']}字を超えています({len(e.gist)}字)。1行に収まりません")
         if not e.explain.strip():
             rep.errors.append(f"{tag} explain が空です")
         if len(e.explain) > LIMITS["explain_hard"]:
@@ -168,7 +174,7 @@ def check_result(data: dict, duration: float | None = None, video_id: str | None
             rep.errors.append(f"{tag} confidence が0〜1の範囲外です({e.confidence})")
 
         # 用語が本文に出てこない
-        body = f"{e.scene}{e.explain}{e.context}{e.expertWhy}"
+        body = f"{e.scene}{e.gist}{e.explain}{e.context}{e.expertWhy}"
         for t in e.terms:
             if t.term not in body:
                 rep.warnings.append(f"{tag} 用語「{t.term}」が scene/explain/why に出てきません")
