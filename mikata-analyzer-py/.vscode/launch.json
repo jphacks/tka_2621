@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "解析: URLを入力して実行",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/analyze.py",
+      "args": ["${input:url}", "--duration", "${input:duration}"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "解析: 保存済みの結果を再チェック(開いているJSON)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/check.py",
+      "args": ["${file}"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ビューア: Webページを起動(localhost:8000)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/serve.py",
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    { "id": "url", "type": "promptString", "description": "YouTubeの動画URL(公式の公開動画)" },
+    { "id": "duration", "type": "promptString", "description": "動画の長さ(秒)", "default": "90" }
+  ]
+}

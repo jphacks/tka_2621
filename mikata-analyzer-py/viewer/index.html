@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- YouTubeの埋め込みは、参照元(Referer)が送られないとエラーになることがある -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>サッカー観戦ガイド（仮）</title>
+<style>
+  :root {
+    --turf: #14342b;
+    --turf-soft: #1f4a3c;
+    --chalk: #edf2ee;
+    --paper: #ffffff;
+    --ink: #12231d;
+    --muted: #55655e;
+    --line: #cdd8d0;
+    --yellow: #f2c230;
+    --yellow-ink: #3a2e00;
+    --alert: #a3241c;
+    --font: "BIZ UDPGothic", "Yu Gothic UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body { margin: 0; background: var(--chalk); color: var(--ink); font-family: var(--font); line-height: 1.6; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+  .page { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; }
+  .top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .top h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  .genres { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px; }
+  .genres button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-weight: 700; color: var(--muted); }
+  .genres button[aria-pressed=true] { background: var(--turf); color: var(--chalk); }
+  .top select { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); max-width: 100%; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+  /* 左: 動画と探す */
+  .stage { aspect-ratio: 16 / 9; background: #000; border-radius: 12px; overflow: hidden; }
+  .stage > * { width: 100%; height: 100%; border: 0; }
+  .stage .placeholder { display: grid; place-content: center; gap: 6px; padding: 24px; text-align: center; background: var(--turf-soft); color: var(--chalk); }
+  .stage .placeholder strong { font-size: 1.15rem; }
+  .stage .placeholder span { color: #c5d6cc; font-size: 0.95rem; }
+
+  .notice { margin: 10px 0 0; padding: 10px 14px; border-radius: 8px; background: #fff3d1; color: var(--yellow-ink); font-size: 0.95rem; }
+  .notice a { color: inherit; font-weight: 700; }
+
+  .scrub { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 14px; background: var(--paper); border-radius: 10px; border: 1px solid var(--line); }
+  .scrub[hidden] { display: none; }
+  .scrub button { padding: 6px 16px; border: 0; border-radius: 8px; background: var(--turf); color: var(--chalk); font-weight: 700; min-width: 4.5em; }
+  .scrub input[type=range] { flex: 1; accent-color: var(--turf); }
+  .scrub output { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; text-align: right; }
+  @media (max-width: 520px) { .scrub { gap: 8px; padding: 10px; } .scrub output { font-size: 0.85rem; } .log-head { flex-wrap: wrap; } }
+
+  .finder { margin-top: 22px; }
+  .finder h2, .log h2 { margin: 0 0 8px; font-size: 1rem; }
+  .finder input[type=search] { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); font-size: 1rem; }
+  .hits { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+  .hit { width: 100%; display: grid; grid-template-columns: 4.2em 1fr; gap: 10px; align-items: baseline; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  .hit:hover { border-color: var(--turf); }
+  .hit .t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--turf); }
+  .hit .s { color: var(--ink); }
+  .hit .s small { display: block; color: var(--muted); }
+  .finder .empty { margin: 10px 0 0; color: var(--muted); font-size: 0.95rem; }
+  .fine { margin: 18px 0 0; color: var(--muted); font-size: 0.85rem; }
+
+  /* 右: いまの解説 */
+  .now { background: var(--turf); color: var(--chalk); border-radius: 16px; padding: 26px 28px 28px; min-height: 260px; }
+  .now.swap { animation: swap 260ms ease-out; }
+  @keyframes swap { from { opacity: 0.25; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .now.swap { animation: none; } }
+
+  .now-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 14px; }
+  .kind, .wow, .doubt { white-space: nowrap; }
+  .kind { display: inline-block; padding: 2px 12px; border-radius: 6px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.95rem; }
+  .clock { font-variant-numeric: tabular-nums; font-size: 1.05rem; color: #b9cdc2; }
+  .now .explain { margin: 0; font-size: clamp(1.45rem, 2.4vw, 2rem); line-height: 1.5; font-weight: 700; }
+  .now .context { margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--turf-soft); font-size: 1rem; color: #e0eae4; }
+  .now .context b { color: var(--yellow); margin-right: 6px; }
+  .now .block { margin: 18px 0 0; padding-left: 14px; border-left: 4px solid var(--yellow); }
+  .now .block .lab { margin: 0 0 2px; font-size: 0.9rem; font-weight: 700; color: var(--yellow); }
+  .now .block p { margin: 0; font-size: 1.15rem; line-height: 1.65; color: #f2f6f3; }
+  .now .block .differs { margin-top: 6px; font-size: 0.92rem; color: #b9cdc2; }
+  .now .block .none-note { font-size: 0.95rem; color: #b9cdc2; }
+  .now.sugoi { box-shadow: 0 0 0 4px var(--yellow); }
+  .now.sugoi.swap { animation: pop 420ms ease-out; }
+  @keyframes pop { 0% { transform: scale(0.985); box-shadow: 0 0 0 0 var(--yellow); } 60% { transform: scale(1.0); box-shadow: 0 0 0 10px rgba(242,194,48,0.5); } 100% { box-shadow: 0 0 0 4px var(--yellow); } }
+  @media (prefers-reduced-motion: reduce) { .now.sugoi.swap { animation: none; } }
+  .wow { display: inline-block; padding: 2px 12px; border-radius: 6px; border: 2px solid var(--yellow); color: var(--yellow); font-weight: 700; font-size: 0.95rem; }
+  .now .scene { margin: 14px 0 0; font-size: 0.9rem; color: #a9bfb3; }
+  .doubt { display: inline-block; margin-left: 8px; padding: 0 8px; border: 1px solid currentColor; border-radius: 6px; font-size: 0.8rem; color: #ffd27a; }
+
+  .now h2 { margin: 0 0 12px; font-size: 1.3rem; }
+  .now ul { margin: 0 0 14px; padding-left: 1.3em; }
+  .now li { margin: 4px 0; font-size: 1.1rem; }
+  .now .sub { margin: 16px 0 6px; font-size: 0.95rem; color: #b9cdc2; font-weight: 700; }
+
+  .terms { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+  .now .terms { padding-left: 0; }
+  .term { padding: 4px 12px; border-radius: 999px; border: 2px solid var(--yellow); background: transparent; color: var(--yellow); font-weight: 700; }
+  .term[aria-expanded=true] { background: var(--yellow); color: var(--yellow-ink); }
+  .meaning { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--turf-soft); font-size: 1rem; }
+  .meaning[hidden] { display: none; }
+
+  /* 右: ここまでの場面 */
+  .log { margin-top: 24px; }
+  .log-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .log-head label { font-size: 0.9rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .item { display: grid; grid-template-columns: 4.2em 1fr; gap: 10px; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  .item.future { opacity: 0.55; }
+  .item .t { align-self: start; padding: 0; border: 0; background: transparent; text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--turf); text-decoration: underline; text-underline-offset: 3px; }
+  .item .k { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+  .item .e { margin: 2px 0 0; }
+  .item .w { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; }
+  .item .wow { margin-left: 8px; padding: 0 8px; font-size: 0.8rem; color: #8a6a00; border-color: #c99a00; }
+  .item .terms { margin-top: 8px; gap: 6px; }
+  .item .term { padding: 1px 10px; border-width: 1.5px; font-size: 0.88rem; color: var(--yellow-ink); border-color: #c99a00; }
+  .item .term[aria-expanded=true] { background: var(--yellow); }
+  .item .meaning { background: #f4f1e3; color: var(--ink); font-size: 0.92rem; }
+  .none { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <h1>サッカー観戦ガイド（仮）</h1>
+    <div class="controls">
+      <div class="genres" role="group" aria-label="たとえのジャンル" id="genres"></div>
+      <select id="picker" aria-label="動画を選ぶ"></select>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section aria-label="動画">
+      <div class="stage" id="stage"></div>
+      <p class="notice" id="notice" hidden></p>
+      <div class="scrub" id="scrub" hidden>
+        <button type="button" id="play">再生</button>
+        <input type="range" id="seek" min="0" max="100" step="0.1" value="0" aria-label="再生位置">
+        <output id="clock" for="seek">00:00 / 00:00</output>
+      </div>
+
+      <div class="finder">
+        <h2>あの場面を探す</h2>
+        <input type="search" id="q" placeholder="覚えていることを書く（例: 左から上がったクロス、キーパーが止めた）" autocomplete="off">
+        <p class="empty" id="qmsg" hidden></p>
+        <ul class="hits" id="hits"></ul>
+      </div>
+      <p class="fine">解説はAIが作ったもので、誤りを含むことがあります。</p>
+    </section>
+
+    <section aria-label="解説">
+      <div class="now" id="now" aria-live="polite"></div>
+      <div class="log">
+        <div class="log-head">
+          <h2>ここまでの場面</h2>
+          <label><input type="checkbox" id="showAll"> これからの場面も表示（確認用）</label>
+        </div>
+        <ul class="items" id="items"></ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+const KIND = {
+  goal: "得点", shot: "シュート", save: "セーブ", foul: "ファウル", offside: "オフサイド",
+  corner: "コーナーキック", free_kick: "フリーキック", penalty: "PK", card: "カード",
+  substitution: "選手交代", pass: "パス", dribble: "ドリブル", tackle: "タックル", other: "その他",
+};
+const GENRE = { rpg: "RPG", fps: "FPS" };
+const LEAD = 0.3;        // 場面の少し手前から出す(秒)
+const LOW_CONF = 0.6;
+
+const $ = (id) => document.getElementById(id);
+const fmt = (s) => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+
+const S = {
+  events: [], preview: null, meta: null, duration: 0,
+  genre: "rpg",              // rpg | fps | none
+  mode: "timer",            // "yt" か "timer"
+  t: 0, playing: false, lastIdx: -2, showAll: false,
+  player: null, apiState: "loading",   // loading | ready | failed
+};
+
+/* ---------- YouTube API ---------- */
+function loadYouTubeApi() {
+  if (window.YT && window.YT.Player) { S.apiState = "ready"; return; }
+  window.onYouTubeIframeAPIReady = () => { S.apiState = "ready"; if (S.pendingOpen) S.pendingOpen(); };
+  const s = document.createElement("script");
+  s.src = "https://www.youtube.com/iframe_api";
+  s.onerror = () => { S.apiState = "failed"; if (S.pendingOpen) S.pendingOpen(); };
+  document.head.append(s);
+  setTimeout(() => { if (S.apiState === "loading") { S.apiState = "failed"; if (S.pendingOpen) S.pendingOpen(); } }, 8000);
+}
+
+const ERR = {
+  100: "動画が見つからないか、非公開です。",
+  101: "この動画は、投稿者が埋め込み再生を許可していません。",
+  150: "この動画は、投稿者が埋め込み再生を許可していません。",
+  153: "プレーヤーの設定エラーです。http://localhost で開いているか確認してください。",
+};
+
+function showNotice(msg, videoId) {
+  const n = $("notice");
+  n.replaceChildren(msg);
+  if (videoId) {
+    n.append(" ", el("a", { href: "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId), target: "_blank", rel: "noopener" }, "YouTubeで開く"));
+  }
+  n.hidden = false;
+}
+
+/* ---------- 動画を開く ---------- */
+async function openVideo(id) {
+  const res = await fetch("/api/videos/" + encodeURIComponent(id));
+  if (!res.ok) { showNotice("結果を読み込めませんでした。"); return; }
+  const j = await res.json();
+  S.meta = j.meta || {};
+  S.preview = j.data.preview || null;
+  S.events = [...j.data.events].sort((a, b) => a.seconds - b.seconds);
+  S.duration = Math.max(S.meta.duration || 0, (S.events.at(-1)?.seconds ?? 0) + 8);
+  S.t = 0; S.playing = false; S.lastIdx = -2;
+  $("notice").hidden = true;
+  $("q").value = ""; renderHits("");
+
+  const videoId = S.meta.videoId;
+  const start = () => {
+    if (!videoId) return enterTimer("サンプルです。動画はなく、下のバーで時間を動かして試せます。");
+    if (S.apiState === "failed") return enterTimer("YouTubeに接続できませんでした。時間を動かして画面だけ試せます。", videoId);
+    if (S.apiState === "loading") { S.pendingOpen = start; return; }
+    S.pendingOpen = null;
+    enterYouTube(videoId);
+  };
+  start();
+  render();
+}
+
+function stagePlaceholder(title, sub) {
+  $("stage").replaceChildren(el("div", { class: "placeholder" }, el("strong", {}, title), el("span", {}, sub)));
+}
+
+function destroyPlayer() {
+  if (S.player && S.player.destroy) { try { S.player.destroy(); } catch (_) {} }
+  S.player = null;
+}
+
+function enterTimer(why, videoId) {
+  destroyPlayer();
+  S.mode = "timer";
+  stagePlaceholder("動画なしの確認モード", "解説の出方を、時間を動かして確かめられます");
+  $("scrub").hidden = false;
+  $("seek").max = S.duration;
+  $("seek").value = 0;
+  $("play").textContent = "再生";
+  if (why) showNotice(why, videoId);
+}
+
+function enterYouTube(videoId) {
+  destroyPlayer();
+  S.mode = "yt";
+  $("scrub").hidden = true;
+  $("stage").replaceChildren(el("div", { id: "player" }));
+  S.player = new YT.Player("player", {
+    videoId,
+    playerVars: { rel: 0, playsinline: 1, origin: location.origin },
+    events: {
+      onError: (e) => {
+        const msg = ERR[e.data] || "動画を再生できませんでした(コード " + e.data + ")。";
+        enterTimer(msg + " 画面の動きは、時間を動かして確かめられます。", videoId);
+        render();
+      },
+    },
+  });
+}
+
+/* ---------- 時刻の進み ---------- */
+setInterval(() => {
+  if (S.mode === "yt" && S.player && typeof S.player.getCurrentTime === "function") {
+    const t = S.player.getCurrentTime();
+    if (typeof t === "number" && !Number.isNaN(t)) S.t = t;
+  } else if (S.mode === "timer" && S.playing) {
+    S.t = Math.min(S.duration, S.t + 0.2);
+    if (S.t >= S.duration) { S.playing = false; $("play").textContent = "再生"; }
+    $("seek").value = S.t;
+  }
+  if (S.mode === "timer") $("clock").textContent = fmt(S.t) + " / " + fmt(S.duration);
+  const idx = currentIndex();
+  if (idx !== S.lastIdx) render();
+}, 200);
+
+const currentIndex = () => S.events.filter((e) => e.seconds <= S.t + LEAD).length;
+
+function seekTo(sec) {
+  S.t = sec;
+  if (S.mode === "yt" && S.player && S.player.seekTo) { S.player.seekTo(sec, true); if (S.player.playVideo) S.player.playVideo(); }
+  else { $("seek").value = sec; }
+  render();
+}
+
+/* ---------- 描画 ---------- */
+function termChips(terms, big) {
+  if (!terms || !terms.length) return null;
+  const ul = el("ul", { class: "terms" });
+  const box = el("p", { class: "meaning", hidden: true });
+  let open = null;
+  for (const t of terms) {
+    const b = el("button", { type: "button", class: "term", "aria-expanded": "false" }, t.term);
+    b.addEventListener("click", () => {
+      const was = open === b;
+      ul.querySelectorAll(".term").forEach((x) => x.setAttribute("aria-expanded", "false"));
+      if (was) { box.hidden = true; open = null; return; }
+      b.setAttribute("aria-expanded", "true");
+      box.textContent = t.term + ": " + t.meaning;
+      box.hidden = false; open = b;
+    });
+    ul.append(el("li", {}, b));
+  }
+  const frag = document.createDocumentFragment();
+  frag.append(ul, box);
+  return frag;
+}
+
+function renderNow(idx) {
+  const now = $("now");
+  now.replaceChildren();
+  now.classList.remove("swap"); void now.offsetWidth; now.classList.add("swap");
+
+  if (idx === 0) {
+    now.classList.remove("sugoi");
+    const p = S.preview;
+    now.append(el("h2", {}, "見る前に"));
+    if (p && p.watchPoints && p.watchPoints.length) {
+      now.append(el("p", { class: "sub" }, "注目するところ"), el("ul", {}, ...p.watchPoints.map((w) => el("li", {}, w))));
+    }
+    if (p && p.basics && p.basics.length) {
+      now.append(el("p", { class: "sub" }, "知っておくと分かりやすいルール"), el("ul", {}, ...p.basics.map((w) => el("li", {}, w))));
+    }
+    if (!p) now.append(el("p", { class: "none" }, "再生すると、ここに解説が出ます。"));
+    else now.append(el("p", { class: "sub" }, "再生すると、場面ごとの解説がここに出ます。"));
+    return;
+  }
+  const e = S.events[idx - 1];
+  const sugoi = !!e.sugoi;
+  now.classList.toggle("sugoi", sugoi);
+  const head = el("div", { class: "now-head" }, el("span", { class: "kind" }, KIND[e.event] || e.event), el("span", { class: "clock" }, fmt(e.seconds)));
+  if (sugoi) head.append(el("span", { class: "wow" }, "ここ、すごい場面"));
+  if (e.confidence < LOW_CONF) head.append(el("span", { class: "doubt" }, "自信低め"));
+  now.append(head, el("p", { class: "explain" }, e.explain));
+  if (e.context) now.append(el("p", { class: "context" }, el("b", {}, "ルール"), e.context));
+  if (sugoi) {
+    const why = e.expertWhy || e.why;
+    if (why) now.append(el("div", { class: "block" }, el("p", { class: "lab" }, "経験者がすごいと思う理由"), el("p", {}, why)));
+    if (S.genre !== "none") {
+      const a = (e.analogies || []).find((x) => x.genre === S.genre);
+      const label = GENRE[S.genre] + "でいうと";
+      if (a) {
+        now.append(el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", {}, a.text), el("p", { class: "differs" }, "ちがうところ: " + a.differs)));
+      } else {
+        now.append(el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", { class: "none-note" }, "この場面は、うまく置き換えられませんでした。")));
+      }
+    }
+  }
+  if (e.scene) now.append(el("p", { class: "scene" }, "映像: " + e.scene));
+  const chips = termChips(e.terms, true);
+  if (chips) now.append(chips);
+}
+
+function renderLog(idx) {
+  const list = $("items");
+  list.replaceChildren();
+  const shown = [];
+  S.events.forEach((e, i) => { if (i < idx - 1 || (S.showAll && i >= idx)) shown.push([e, i]); });
+  shown.sort((a, b) => b[0].seconds - a[0].seconds);
+  if (!shown.length) { list.append(el("li", { class: "none" }, idx === 0 ? "まだ場面はありません。" : "これより前の場面はありません。")); return; }
+  for (const [e, i] of shown) {
+    const body = el("div", {},
+      el("div", { class: "k" }, KIND[e.event] || e.event, e.sugoi ? el("span", { class: "wow" }, "すごい") : null),
+      el("p", { class: "e" }, e.explain),
+      (e.expertWhy || e.why) ? el("p", { class: "w" }, e.expertWhy || e.why) : null,
+      termChips(e.terms, false));
+    list.append(el("li", { class: "item" + (i >= idx ? " future" : "") },
+      el("button", { type: "button", class: "t", title: "この場面へ", onclick: () => seekTo(e.seconds) }, fmt(e.seconds)),
+      body));
+  }
+}
+
+function render() {
+  const idx = currentIndex();
+  S.lastIdx = idx;
+  renderNow(idx);
+  renderLog(idx);
+}
+
+/* ---------- 場面を探す ---------- */
+const norm = (s) => String(s || "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+const grams = (s) => {
+  const out = new Set();
+  const t = norm(s);
+  if (t.length === 1) out.add(t);
+  for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
+  return out;
+};
+function search(q) {
+  const qg = grams(q);
+  if (!qg.size) return [];
+  const res = [];
+  for (const e of S.events) {
+    const doc = [e.scene, e.explain, e.context, e.expertWhy, e.why, KIND[e.event],
+      ...(e.analogies || []).map((a) => a.text), ...(e.terms || []).map((t) => t.term)].join("");
+    const dg = grams(doc);
+    let hit = 0;
+    qg.forEach((g) => { if (dg.has(g)) hit++; });
+    if (hit) res.push({ e, score: hit / qg.size });
+  }
+  return res.sort((a, b) => b.score - a.score).slice(0, 5).filter((r) => r.score >= 0.25);
+}
+function renderHits(q) {
+  const ul = $("hits"), msg = $("qmsg");
+  ul.replaceChildren();
+  if (!q.trim()) { msg.hidden = true; return; }
+  const r = search(q);
+  if (!r.length) { msg.textContent = "近い場面が見つかりません。別の言葉で試してください。"; msg.hidden = false; return; }
+  msg.hidden = true;
+  for (const { e } of r) {
+    ul.append(el("li", {}, el("button", { type: "button", class: "hit", onclick: () => seekTo(e.seconds) },
+      el("span", { class: "t" }, fmt(e.seconds)),
+      el("span", { class: "s" }, e.explain, el("small", {}, e.scene)))));
+  }
+}
+
+/* ---------- 起動 ---------- */
+async function init() {
+  loadYouTubeApi();
+  try { const g = localStorage.getItem("genre"); if (g === "none" || GENRE[g]) S.genre = g; } catch (_) {}
+  const gbox = $("genres");
+  const gopts = [...Object.entries(GENRE), ["none", "たとえなし"]];
+  const paintGenres = () => gbox.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.g === S.genre)));
+  for (const [g, label] of gopts) {
+    gbox.append(el("button", { type: "button", "data-g": g, onclick: () => {
+      S.genre = g; paintGenres(); render();
+      try { localStorage.setItem("genre", g); } catch (_) {}
+    } }, label));
+  }
+  paintGenres();
+  $("play").addEventListener("click", () => {
+    if (S.t >= S.duration) { S.t = 0; $("seek").value = 0; }
+    S.playing = !S.playing;
+    $("play").textContent = S.playing ? "停止" : "再生";
+  });
+  $("seek").addEventListener("input", (ev) => { S.t = Number(ev.target.value); render(); });
+  $("q").addEventListener("input", (ev) => renderHits(ev.target.value));
+  $("showAll").addEventListener("change", (ev) => { S.showAll = ev.target.checked; render(); });
+
+  const res = await fetch("/api/videos");
+  const vids = res.ok ? await res.json() : [];
+  const picker = $("picker");
+  if (!vids.length) {
+    picker.hidden = true;
+    $("now").replaceChildren(el("h2", {}, "表示できる結果がありません"), el("p", {}, "python analyze.py で動画を解析すると、ここに表示されます。"));
+    return;
+  }
+  for (const v of vids) {
+    picker.append(el("option", { value: v.id }, (v.sample ? "サンプル（動画なし）" : v.id) + "  " + v.count + "場面"));
+  }
+  picker.addEventListener("change", () => openVideo(picker.value));
+  openVideo(vids[0].id);
+}
+init();
+</script>
+</body>
+</html>

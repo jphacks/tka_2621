@@ -1,0 +1,67 @@
+{
+  "preview": {
+    "watchPoints": ["ひとつだけ"],
+    "basics": ["a", "b", "c", "d"]
+  },
+  "events": [
+    {
+      "time": "00:30",
+      "seconds": 30,
+      "event": "pass",
+      "scene": "赤い選手がパスを出す",
+      "explain": "パスを出した。",
+      "context": "",
+      "sugoi": false,
+      "sugoiType": "none",
+      "expertWhy": "",
+      "analogies": [],
+      "terms": [{ "term": "ビルドアップ", "meaning": "後ろからつなぐ攻め" }],
+      "confidence": 0.9
+    },
+    {
+      "time": "0:10",
+      "seconds": 10,
+      "event": "shot",
+      "scene": "田中選手がシュート",
+      "explain": "パスを出した。",
+      "context": "",
+      "sugoi": true,
+      "sugoiType": "none",
+      "expertWhy": "",
+      "analogies": [
+        { "genre": "fps", "text": "エントリーでクラッチを決めるような動き。", "differs": "" },
+        { "genre": "rpg", "text": "オフサイドラインを抜ける勇者の動き。", "differs": "実際は違う。" }
+      ],
+      "terms": [],
+      "confidence": 0.3
+    },
+    {
+      "time": "01:05",
+      "seconds": 70,
+      "event": "other",
+      "scene": "何かが起きる",
+      "explain": "この場面は非常に長い解説になってしまっていて、初心者が一度で読み取れる長さをはるかに超えており、画面の横のカードに収まらないので、実際のデモでは読んでもらえずに流されてしまうという問題があります。さらにもう少し続けて、百二十字を確実に超えるようにしておきます。",
+      "context": "",
+      "sugoi": false,
+      "sugoiType": "off_ball",
+      "expertWhy": "すごい",
+      "analogies": [],
+      "terms": [],
+      "confidence": 1.4
+    },
+    {
+      "time": "03:00",
+      "seconds": 180,
+      "event": "goal",
+      "scene": "ゴールが決まる",
+      "explain": "ゴール。",
+      "context": "",
+      "sugoi": true,
+      "sugoiType": "technique",
+      "expertWhy": "上手い。",
+      "analogies": [],
+      "terms": [],
+      "confidence": 0.9
+    }
+  ]
+}

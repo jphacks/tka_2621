@@ -1,0 +1,113 @@
+# mikata-analyzer (Python / VS Code 版)
+
+YouTube動画のURLをGeminiに渡して、**時刻ごとの「何が起きたか」「経験者がすごいと思う理由」「ジャンル別のたとえ」のJSON**を作る。
+想定する使い方は、サッカーのルールを知らない人と経験者が、並んで同じ動画を見ること。
+作ったJSONを品質チェックして、人が確かめるべき場面を YouTube のリンク付きで出す。
+
+> ⚠️ 本物のGemini APIを呼ぶ部分は、Claudeの環境からは試せていません。
+> 確認できたのは、①偽のクライアントでの流れ、②**本物のSDKが送信するリクエストの中身**(通信だけ差し替え)までです。
+> **最初の1回は、必ず自分の手元で実行して結果を確かめてください。**
+
+## 準備(VS Codeのターミナルで)
+
+```bash
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# Mac/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env     # .env を開いて GEMINI_API_KEY を入れる(Windowsは copy)
+pytest                   # 28件通ればOK(APIは呼ばない)
+```
+
+Python 3.10以上。VS Code では「Python」拡張を入れ、右下のインタープリターに `.venv` を選ぶ。
+
+## 使い方
+
+```bash
+# 公式チャンネルが公開しているハイライトのURLを渡す
+python analyze.py "https://www.youtube.com/watch?v=XXXXXXXXXXX" --duration 90
+
+# 保存済みの結果を、あとから品質チェックだけする
+python check.py out/XXXXXXXXXXX.json --duration 90
+```
+
+VS Code から実行したいとき: 左の「実行とデバッグ」→「解析: URLを入力して実行」(URLと長さを聞かれる)。
+JSONを開いた状態で「解析: 保存済みの結果を再チェック」を選ぶと、そのファイルをチェックできる。
+
+結果は `out/<動画ID>.json`(meta + data)と `out/<動画ID>.report.txt`。
+同じ動画はキャッシュされ、2回目以降はAPIを呼ばない(解析し直すなら `--force`)。
+→ **デモ用の動画は、事前に解析して `out/` を保存しておく。会場で解析しない。**
+
+### オプション
+
+| オプション | 内容 |
+| --- | --- |
+| `--duration <秒>` | 動画の長さ。分かれば時刻の範囲チェックが効く |
+| `--model <名前>` | モデル名。既定は `gemini-3.8-flash`(環境変数 `GEMINI_MODEL` でも指定可) |
+| `--retries <n>` | 品質チェックに通らないときのやり直し回数(既定3) |
+| `--start <秒> --end <秒>` | 解析する区間 |
+| `--fps <数>` | 1秒あたりのフレーム数。速い場面の取りこぼしが多いときに上げる |
+| `--force` | 保存済みでも解析し直す |
+
+## Webページで見る(ビューア)
+
+```bash
+python serve.py          # → http://localhost:8000 をブラウザで開く
+```
+
+- 左に埋め込みのYouTube動画、右に「いまの解説」が再生位置に合わせて切り替わる。用語のボタンを押すと意味が出る。
+- すごい場面に来ると、カードが黄色い枠で光り、「経験者がすごいと思う理由」と「RPGでいうと / FPSでいうと」が出る。右上のボタンでジャンルを切り替える(「たとえなし」も選べる)。たとえには、必ず「ちがうところ」が付く。
+- ルールが絡む場面(オフサイドなど)は、「ルール」の補足が出る。
+- 「あの場面を探す」: 覚えていることを書くと、`scene`・`explain` などから近い場面を探してジャンプする(簡易な文字一致。意味検索ではない)。
+- `out/` に結果が無いときは、`sample/good.json` を「サンプル」として出す(動画なし。下のバーで時間を動かして試せる)。
+- 動画が埋め込み禁止・非公開・ネット未接続のときは、同じく動画なしの確認モードに切り替わり、理由が出る。
+- ファイルを直接開く(file://)のではなく、必ず `python serve.py` 経由で開く(YouTubeの埋め込みが動かなくなるため)。
+- 仲間に見せるときだけ `--host 0.0.0.0`(同じネットワークの人に見える)。
+- 動画の埋め込み再生は、Claudeの環境では本物のYouTubeに繋げず、**YouTube側を模したスタブ**で確かめた。**実際に再生されるかは、手元で1度確認してください**。
+
+## 1場面に入っているもの
+
+| 項目 | 内容 |
+| --- | --- |
+| `explain` | 何が起きたか(ルールを知らない人向けの一言) |
+| `context` | ルールが絡んで一目で分かりにくい場面だけの補足(オフサイドなど)。不要なら空文字 |
+| `sugoi` / `sugoiType` | 経験者が「おっ」と思う場面か / すごさの種類(`schema.py` の `SUGOI_TYPES`) |
+| `expertWhy` | 経験者がなぜすごいと感じるか |
+| `analogies` | ジャンル別のたとえ。`text`=たとえ、`differs`=実際との違い(必須) |
+
+- 対応ジャンルは `rpg` と `fps`。増やすときは `schema.py` の `GENRES` と `Literal`、`viewer/index.html` の `GENRE` に足す。
+- **すごさの理由は、玄人(あなた)が直せる**。`out/<動画ID>.json` を直接開いて `expertWhy` や `analogies` を書き換えたら、`python check.py out/<動画ID>.json` で形を確かめ、ビューアを再読み込みする。
+- 論文(Bernstein & Sibia, 2026)では、たとえに使った元の領域を深く知る人ほど、構造のずれに気づいた。そのため、たとえを確認するときは「そのゲームをよく知っている人」にも見てもらう。
+
+## 他のコードから使う(アプリに組み込むとき)
+
+```python
+import json
+from check import check_result
+
+saved = json.load(open("out/XXXXXXXXXXX.json", encoding="utf-8"))
+events = saved["data"]["events"]      # time / seconds / event / scene / explain / context / sugoi / sugoiType / expertWhy / analogies / terms / confidence
+preview = saved["data"]["preview"]    # watchPoints / basics
+```
+
+`seconds` が再生位置(秒)。埋め込みプレーヤーの現在位置と比べて、解説カードを切り替える。
+`scene` は事実だけの描写なので、「あの場面」検索の手がかりにも使える。
+
+## 品質チェックの見方
+
+| 区分 | 意味 | 対応 |
+| --- | --- | --- |
+| エラー | 時刻の逆行・秒数の不一致・動画の長さ超過・極端に長い解説など | 自動でやり直す。通らなければ失敗 |
+| 警告 | 文字数超過・用語が本文に無い・解説の使い回し・長い空白など | 目で見て判断 |
+| 人手確認 | confidenceが低い・種類不明(other)・選手名らしき記述・**すべてのすごい場面**・たとえに入ったゲーム用語 | **リンクを開いて、映像と合っているか確かめる。すごさの理由は玄人が判断する** |
+
+**チェッカーが見られないもの**: 時刻が*実際の映像と*合っているか、解説が*事実として*正しいか。
+これは人が見るしかない。人手確認リストから先に当たり、残りは数か所を抜き打ちで確かめる。
+
+## 未検証・要確認
+
+- Gemini APIの呼び出し方(`client.interactions.create`、`response_format`)は、2026年10月時点の公式ドキュメントとSDK(Python `google-genai` 2.31)に合わせている。モデル名や仕様は変わるので、動かなければエラー文を確認し、公式の動画理解のページを見る。
+- `--start / --end / --fps` の `processing` は、公式のYouTube URLの例には載っていない組み合わせ。エラーになったら外して試す。
+- YouTube URLでの解析はプレビュー機能で、**公開動画のみ**。無料枠は1日8時間分まで。
+- 動画の権利: 公式チャンネルが公開しているものだけを使い、動画自体は保存しない。YouTubeとGoogleの利用規約は未確認。
+- 選手名・チーム名は誤りやすい。プロンプトで「確実なものだけ」と指示しているが、必ず人が確認する。
