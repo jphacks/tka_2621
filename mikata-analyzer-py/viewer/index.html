@@ -53,11 +53,28 @@
   .stage .placeholder strong { font-size: 1.15rem; }
   .stage .placeholder span { color: #c5d6cc; font-size: 0.95rem; }
 
-  /* 動画の真下の1行。ここだけ見れば流れが分かる */
-  .strip { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 0 4px; min-height: 2.6rem; color: var(--chalk); }
+  /* 動画の下の時間の帯。YouTube のシークバーは操作がないと消えるので、自前のものを外側に常に出す。
+     すごい場面の印(黄色い点)を置く。プレーヤーの上には重ねない */
+  .tl { position: relative; height: 24px; margin-top: 10px; cursor: pointer; }
+  .tl .track, .tl .fill { position: absolute; left: 0; top: 10px; height: 4px; border-radius: 2px; }
+  .tl .track { right: 0; background: #2c4a3e; }
+  .tl .fill { width: 0; background: #7fb59b; }
+  .tl .now { position: absolute; top: 5px; width: 3px; height: 14px; margin-left: -1px; border-radius: 2px; background: var(--chalk); pointer-events: none; }
+  .tl .dot { position: absolute; top: 4px; width: 16px; height: 16px; margin-left: -8px; padding: 0; border-radius: 50%; border: 2px solid var(--turf-deep); background: var(--yellow); transition: transform 200ms ease, opacity 200ms ease; }
+  .tl .dot.past { opacity: 0.4; }
+  .tl .dot.soon { transform: scale(1.5); box-shadow: 0 0 0 3px rgba(242,194,48,0.45); }
+  .tl .dot:focus-visible { outline: 3px solid var(--chalk); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .tl .dot { transition: none; } }
+
+  /* 動画の真下。ここだけ見れば流れが分かる。すごい場面は、翻訳した一言を大きく出す */
+  .strip { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 0 4px; min-height: 4.6rem; color: var(--chalk); }
   .strip .when { flex: none; font-size: 0.85rem; color: #a9bfb3; font-variant-numeric: tabular-nums; min-width: 2.8em; }
   .strip .kind { flex: none; }
   .strip .gist { flex: 1; min-width: 0; margin: 0; font-size: 1.2rem; font-weight: 700; line-height: 1.4; }
+  .strip .lines { flex: 1; min-width: 0; }
+  .strip .lines .gist { flex: none; font-size: 0.95rem; font-weight: 400; color: #b9cdc2; }
+  .strip .live { margin: 2px 0 0; font-size: 1.35rem; font-weight: 700; line-height: 1.4; color: var(--chalk); }
+  .strip .live .game { display: inline-block; margin-right: 10px; padding: 0 8px; border-radius: 6px; background: #3b3a1c; color: var(--yellow); font-size: 0.85rem; font-weight: 700; vertical-align: 0.1em; }
   .strip .gist.idle { font-weight: 400; color: #a9bfb3; font-size: 1rem; }
   .strip .soon { flex: none; padding: 1px 10px; border-radius: 6px; border: 2px solid var(--yellow); color: var(--yellow); font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
   .strip .wow { flex: none; padding: 1px 10px; border-radius: 6px; background: var(--yellow); color: var(--yellow-ink); font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
@@ -145,6 +162,10 @@
     <section aria-label="動画">
       <div class="theater" id="theater">
         <div class="stage" id="stage"></div>
+        <div class="tl" id="tl" aria-label="すごい場面の位置。押すとその少し前へ移動します">
+          <div class="track"></div><div class="fill" id="tlFill"></div>
+          <div id="tlDots"></div><div class="now" id="tlNow"></div>
+        </div>
         <div class="strip" id="strip" aria-live="polite"></div>
       </div>
       <p class="notice" id="notice" hidden></p>
@@ -185,9 +206,9 @@ const KIND = {
   corner: "コーナーキック", free_kick: "フリーキック", penalty: "PK", card: "カード",
   substitution: "選手交代", pass: "パス", dribble: "ドリブル", tackle: "タックル", other: "その他",
 };
-const DEFAULT_GAMES = { rpg: "ドラゴンクエスト", fps: "Apex Legends" };
-const GENRE = { rpg: "RPG", fps: "FPS" };  // キーの一覧
-const gameName = (g) => ((S.meta && S.meta.games && S.meta.games[g]) || DEFAULT_GAMES[g] || g);
+const DEFAULT_TOPICS = { a: "ポケットモンスター", b: "Apex Legends" };
+const GENRE = { a: 1, b: 1 };  // キーの一覧
+const gameName = (g) => ((S.meta && S.meta.topics && S.meta.topics[g]) || DEFAULT_TOPICS[g] || g);
 const LEAD = 0.3;          // 場面の少し手前から出す(秒)
 const SUGOI_LEAD = 3;      // すごい場面は、この秒数前から先出しする
 const GLOW_HOLD = 6;       // すごい場面のあと、光らせ続ける秒数
@@ -208,7 +229,7 @@ const el = (tag, props = {}, ...kids) => {
 
 const S = {
   events: [], preview: null, meta: null, duration: 0,
-  genre: "rpg",              // rpg | fps | none
+  genre: "a",                // a | b | none
   audio: false, spoken: new Set(),
   mode: "timer",             // "yt" か "timer"
   t: 0, playing: false, lastKey: "",
@@ -251,6 +272,7 @@ async function openVideo(id) {
   S.meta = j.meta || {};
   S.vid = id;
   relabelGenres();
+  tlDur = 0;
   S.preview = j.data.preview || null;
   S.events = [...j.data.events].sort((a, b) => a.seconds - b.seconds);
   S.duration = Math.max(S.meta.duration || 0, (S.events.at(-1)?.seconds ?? 0) + 8);
@@ -308,6 +330,42 @@ function enterYouTube(videoId) {
   });
 }
 
+/* ---------- 時間の帯(すごい場面の印つき) ---------- */
+let tlDur = 0, tlDots = [];
+function totalDuration() {
+  if (S.mode === "yt" && S.player && S.player.getDuration) {
+    try { const d = S.player.getDuration(); if (d > 0) return d; } catch (_) {}
+  }
+  return S.duration || 0;
+}
+function buildTimeline() {
+  const box = $("tlDots");
+  box.replaceChildren();
+  tlDots = [];
+  tlDur = totalDuration();
+  if (!tlDur) return;
+  for (const e of S.events) {
+    if (!e.sugoi) continue;
+    const b = el("button", { type: "button", class: "dot", title: fmt(e.seconds) + " すごい場面へ", "aria-label": fmt(e.seconds) + " すごい場面へ移動",
+      onclick: (ev) => { ev.stopPropagation(); seekTo(Math.max(0, e.seconds - SUGOI_LEAD)); } });
+    b.style.left = Math.min(100, (e.seconds / tlDur) * 100) + "%";
+    box.append(b);
+    tlDots.push({ e, b });
+  }
+}
+function updateTimeline() {
+  const d = totalDuration();
+  if (d && Math.abs(d - tlDur) > 0.5) buildTimeline();
+  if (!tlDur) return;
+  const r = Math.max(0, Math.min(1, S.t / tlDur)) * 100;
+  $("tlFill").style.width = r + "%";
+  $("tlNow").style.left = r + "%";
+  for (const { e, b } of tlDots) {
+    b.classList.toggle("past", e.seconds < S.t - 1);
+    b.classList.toggle("soon", e.seconds >= S.t && e.seconds - S.t <= SUGOI_LEAD + 3);
+  }
+}
+
 /* ---------- 時刻の進み ---------- */
 setInterval(() => {
   if (S.mode === "yt" && S.player && typeof S.player.getCurrentTime === "function") {
@@ -325,6 +383,7 @@ setInterval(() => {
       && S.t >= x.seconds - LIVE_LEAD && S.t < x.seconds + 2);
     if (e) { S.spoken.add(e.seconds); playLive(e); }
   }
+  updateTimeline();
   if (view().key !== S.lastKey) render();
 }, 200);
 
@@ -429,10 +488,15 @@ function renderStrip(v) {
   if (!e) {
     strip.append(el("p", { class: "gist idle" }, "再生すると、ここに一言が出ます。"));
   } else {
+    const a = e.sugoi && S.genre !== "none" ? (e.analogies || []).find((x) => x.genre === S.genre) : null;
+    const text = a && a.live
+      ? el("div", { class: "lines" }, el("p", { class: "gist" }, e.gist || e.explain),
+          el("p", { class: "live" }, el("span", { class: "game" }, gameName(S.genre)), a.live))
+      : el("p", { class: "gist" }, e.gist || e.explain);
     strip.append(
       el("span", { class: "when" }, fmt(e.seconds)),
       el("span", { class: "kind" }, KIND[e.event] || e.event),
-      el("p", { class: "gist" }, e.gist || e.explain),
+      text,
       v.next ? el("span", { class: "soon" }, "まもなく、すごい") : (e.sugoi ? el("span", { class: "wow" }, "ここ、すごい") : null),
     );
   }
@@ -592,6 +656,12 @@ async function init() {
     $("play").textContent = S.playing ? "停止" : "再生";
   });
   $("seek").addEventListener("input", (ev) => { S.t = Number(ev.target.value); S.spoken.clear(); stopSpeech(); render(); });
+  $("tl").addEventListener("click", (ev) => {
+    const d = totalDuration();
+    if (!d) return;
+    const box = $("tl").getBoundingClientRect();
+    seekTo(Math.max(0, Math.min(d, ((ev.clientX - box.left) / box.width) * d)));
+  });
   $("q").addEventListener("input", (ev) => renderHits(ev.target.value));
   $("showAll").addEventListener("change", (ev) => { S.showAll = ev.target.checked; render(); });
   document.addEventListener("fullscreenchange", () => setTimeout(render, 150)); // 画面サイズが落ち着いてから描き直す

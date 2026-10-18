@@ -39,10 +39,10 @@ SUGOI_TYPES = {
     "other": "上のどれでもないすごさ",
 }
 
-# たとえに使うゲーム。キー(rpg/fps)はデータ上の区別、値が実際にたとえに使うタイトル。
-# 読み手(初心者)がよく知っているタイトルに変える。analyze.py の --game rpg=タイトル でも変えられる
-DEFAULT_GAMES = {"rpg": "ドラゴンクエスト", "fps": "Apex Legends"}
-GENRES = list(DEFAULT_GAMES)
+# たとえに使う題材。キー(a/b)はデータ上の区別、値が実際にたとえに使うもの。
+# 読み手(初心者)がよく知っているものを選ぶ。analyze.py の --topic a=題材 でも変えられる
+DEFAULT_TOPICS = {"a": "ポケットモンスター", "b": "Apex Legends"}
+GENRES = list(DEFAULT_TOPICS)
 
 JSON_SCHEMA: dict = {
     "type": "object",
@@ -161,7 +161,7 @@ class Term(_Strict):
 
 
 class Analogy(_Strict):
-    genre: Literal["rpg", "fps"]
+    genre: Literal["a", "b"]
     text: str
     live: str
     differs: str

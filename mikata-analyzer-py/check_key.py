@@ -36,9 +36,22 @@ def main() -> int:
         print("2. REST(models一覧): OK … キーは有効です")
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")
-        reason = "ACCESS_TOKEN_TYPE_UNSUPPORTED" if "ACCESS_TOKEN_TYPE_UNSUPPORTED" in body else ""
-        print(f"2. REST(models一覧): 失敗 HTTP {e.code} {reason}")
-        print("   → このキーは Gemini API では使えない種類です。AI Studio で作り直すか、前に使えていたキーに戻してください")
+        try:
+            err = json.loads(body)["error"]
+            reason = (err.get("details") or [{}])[0].get("reason", "")
+            status = err.get("status", "")
+        except (ValueError, KeyError, TypeError, IndexError):
+            reason = status = ""
+        print(f"2. REST(models一覧): 失敗 HTTP {e.code} {status} {reason}")
+        if reason == "ACCESS_TOKEN_TYPE_UNSUPPORTED":
+            print("   → 新しい形式(AQ.)のキーが、この入口で受け付けられていません。AIza の形式のキーを使ってください")
+        elif reason == "API_KEY_INVALID":
+            print("   → Google がこのキーを知りません。貼り間違い(1文字違い)、削除・無効化、または作成直後で未反映の可能性があります。")
+            print("     AI Studio のコピーボタンで貼り直し、キーが一覧に残っているか確認し、数分待って再試行してください")
+        elif reason in ("SERVICE_DISABLED", "API_KEY_SERVICE_BLOCKED"):
+            print("   → キーの制限か、API が有効になっていません。Generative Language API を有効にし、キーの制限に含めてください")
+        else:
+            print("   → 原因を特定できませんでした。上の HTTP コードと理由を教えてください")
         return 1
     except OSError as e:
         print(f"2. REST: 通信できません: {e}"); return 1

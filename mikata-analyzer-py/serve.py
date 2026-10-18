@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 HERE = Path(__file__).parent
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_AUDIO_RE = re.compile(r"^[0-9]{1,6}-[a-z]{2,8}\.wav$")
+_AUDIO_RE = re.compile(r"^[0-9]{1,6}-[a-z0-9]{1,8}\.wav$")
 SAMPLE_ID = "sample"
 
 

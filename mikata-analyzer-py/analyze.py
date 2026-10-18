@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from check import Report, check_result, format_report
-from schema import DEFAULT_GAMES, JSON_SCHEMA
+from schema import DEFAULT_TOPICS, JSON_SCHEMA
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 
@@ -44,24 +44,25 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"YouTubeの動画IDを取り出せません: {url}")
 
 
-def analogy_rules(games: dict) -> str:
-    names = "、".join(f"{g}={t}" for g, t in games.items())
-    example = ("(例 ドラゴンクエスト: 敵が前に集まってる、その間に後ろの仲間へバイキルト / 例 Apex Legends: 敵が全員同じ建物に集まった、がら空きの反対側から回り込む)。"
-               if games == DEFAULT_GAMES else "")
+def analogy_rules(topics: dict) -> str:
+    names = "、".join(f"{g}={t}" for g, t in topics.items())
+    example = ("(例 ポケットモンスター: 相手の注意が前に集まった、控えへ交代して有利を取る / 例 Apex Legends: 敵が全員同じ建物に集まった、がら空きの反対側から回り込む)。"
+               if topics == DEFAULT_TOPICS else "")
     return f"""【たとえ(analogies)】
-- sugoi が true の場面には、次のゲームそれぞれで、たとえを1つずつ書く(genre には左のキーを入れる): {names}。sugoi が false なら空配列。
-- 読み手は、そのゲームを普通に遊んだことがあります。そのゲームに**実際にある**場面・操作・仕組み・場所の名前で、具体的に書く。ゲーム名は文章に入れなくてよい(画面の見出しに出る)。
-- たとえは、「経験者がすごいと感じる構造」をそのゲームの場面に置き換える。表面的な似方ではなく、何が難しいか・何を可能にしたかの構造を合わせる。
+- sugoi が true の場面には、次の題材それぞれで、たとえを1つずつ書く(genre には左のキーを入れる): {names}。sugoi が false なら空配列。
+- 題材は、読み手がよく知っているものです。誰がどこにいて、何が空いて、何が間に合うか、という**構造**で置き換える。
+- たとえは、「経験者がすごいと感じる構造」をその題材の場面に置き換える。表面的な似方ではなく、何が難しいか・何を可能にしたかの構造を合わせる。
+- その題材に**実際にある**場面・操作・仕組みの名前で、具体的に書く。題材の名前そのものは文章に入れなくてよい(画面の見出しに出る)。
 - 大げさな言葉・詩的な言い回し・造語は使わない(「必殺」「覚醒」「運命」「闇」「勇者」「伝説の」など)。友達に「あれ、〇〇でいうとさ」と話すときの、ふつうの口調で書く。
-- 構造がうまく合わないときは、無理にたとえず、そのゲームは省く。
+- 構造がうまく合わないときは、無理にたとえず、その題材は省く。
 - サッカーの用語や選手名は、たとえの中に入れない。
 - differs には、そのたとえと実際のサッカーで違うところを、必ず60字以内で書く。
 - text は90字以内。
-- live: 音声で読む、そのゲームの**実況の一言二言**を40字以内で書く。たとえ(text)の要約ではなく、いまプレーが起きているのを、そのゲームの実際の場面に置き換えて実況する。ふつうの話し言葉で、感嘆符は多くて1つ。{example}ひとつの場面を2文以内に収め、聞いて3秒で終わる長さにする。"""
+- live: 音声で読む、その題材の**実況の一言二言**を40字以内で書く。たとえ(text)の要約ではなく、いまプレーが起きているのを、その題材の場面に置き換えて実況する。ふつうの話し言葉で、感嘆符は多くて1つ。{example}ひとつの場面を2文以内に収め、聞いて3秒で終わる長さにする。"""
 
 
-def build_prompt(feedback: str = "", games: dict | None = None) -> str:
-    games = games or DEFAULT_GAMES
+def build_prompt(feedback: str = "", topics: dict | None = None) -> str:
+    topics = topics or DEFAULT_TOPICS
     prompt = """あなたは、サッカーに詳しい経験者です。サッカーのルールをまったく知らない友人と、隣に座って一緒にこの動画を見ています。
 経験者が「おっ、すごい!」と感じる場面で、友人も同じ熱量で盛り上がれるように、場面ごとの解説を指定のJSONで作ってください。
 
@@ -93,7 +94,7 @@ def build_prompt(feedback: str = "", games: dict | None = None) -> str:
 - preview.basics: この動画を理解するのに必要な前提ルールを最大3つ。
 - すべて日本語で書く。
 """
-    prompt = prompt.replace("{ANALOGY_RULES}", analogy_rules(games))
+    prompt = prompt.replace("{ANALOGY_RULES}", analogy_rules(topics))
     if feedback:
         prompt += f"\n【前回の出力の問題】\n{feedback}\n上の問題を直して、JSON全体を出し直してください。\n"
     return prompt
@@ -118,7 +119,7 @@ def analyze_video(
     max_retries: int = 3,
     log=lambda _msg: None,
     backoff_s: float = 2.0,
-    games: dict | None = None,
+    topics: dict | None = None,
 ) -> dict:
     """成功すると {video_id, data, report, attempts} を返す。失敗すると AnalysisFailed。"""
     video_id = extract_video_id(url)
@@ -134,7 +135,7 @@ def analyze_video(
             interaction = client.interactions.create(
                 model=model,
                 # 公式ガイドに合わせて、動画パートの後にテキストを置く
-                input=[video_part, {"type": "text", "text": build_prompt(feedback, games)}],
+                input=[video_part, {"type": "text", "text": build_prompt(feedback, topics)}],
                 response_format={"type": "text", "mime_type": "application/json", "schema": JSON_SCHEMA},
             )
             text = interaction.output_text
@@ -181,7 +182,7 @@ def validate_api_key(key: str) -> str | None:
     """キーの形に問題があれば、直し方つきのメッセージを返す。中身は表示しない。"""
     if not key.isascii():
         return ("APIキーに、英数字以外の文字が入っています。.env の GEMINI_API_KEY= の右側が、"
-                "初期値(ここにキー)のままか、日本語が混ざっていませんか。AIzaで始まる英数字だけにしてください")
+                "初期値(ここにキー)のままか、日本語が混ざっていませんか。AI Studio で表示されたキーを、そのまま貼り直してください(英数字と記号だけで、日本語や空白は入りません)")
     if any(c.isspace() for c in key):
         return "APIキーの途中に空白や改行が入っています。.env の GEMINI_API_KEY= の行を確認してください"
     return None
@@ -198,19 +199,19 @@ def main() -> int:
     ap.add_argument("--end", type=float, help="解析する区間の終了(秒)。未検証の組み合わせ")
     ap.add_argument("--fps", type=float, help="1秒あたりのフレーム数。未検証の組み合わせ")
     ap.add_argument("--force", action="store_true", help="保存済みでも解析し直す")
-    ap.add_argument("--game", action="append", metavar="キー=タイトル",
-                    help="たとえに使うゲームを変える(例: --game rpg=ポケットモンスター --game fps=Apex)。キーは rpg / fps")
+    ap.add_argument("--topic", "--game", dest="topic", action="append", metavar="キー=題材",
+                    help="たとえに使う題材を変える(例: --topic a=ポケットモンスター --topic b=Apex)。キーは a / b")
     ap.add_argument("--tts", action="store_true", help="解析のあと、続けて読み上げ音声も作る(tts.py と同じ)")
     args = ap.parse_args()
 
     env_path = _load_dotenv()
-    games = dict(DEFAULT_GAMES)
-    for item in args.game or []:
+    topics = dict(DEFAULT_TOPICS)
+    for item in args.topic or []:
         key, _, title = item.partition("=")
-        if key not in games or not title.strip():
-            print(f"--game は キー=タイトル の形で、キーは {' / '.join(games)} のどれかです: {item}", file=sys.stderr)
+        if key not in topics or not title.strip():
+            print(f"--topic は キー=題材 の形で、キーは {' / '.join(topics)} のどれかです: {item}", file=sys.stderr)
             return 2
-        games[key] = title.strip()
+        topics[key] = title.strip()
     try:
         video_id = extract_video_id(args.url)
     except ValueError as err:
@@ -251,12 +252,12 @@ def main() -> int:
 
     model = args.model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
     print(f"読み込んだ .env: {env_path or '(なし)'}  キーの長さ: {len(api_key)}文字")
-    print(f"解析開始: {args.url}\nモデル: {model}\nたとえのゲーム: {games}" + (f"\n区間/fps: {json.dumps(processing)}" if processing else ""))
+    print(f"解析開始: {args.url}\nモデル: {model}\nたとえの題材: {topics}" + (f"\n区間/fps: {json.dumps(processing)}" if processing else ""))
 
     try:
         res = analyze_video(
             client, args.url, model=model, processing=processing,
-            duration=args.duration, max_retries=args.retries, log=lambda m: print(f"  {m}"), games=games,
+            duration=args.duration, max_retries=args.retries, log=lambda m: print(f"  {m}"), topics=topics,
         )
     except AnalysisFailed as err:
         last = err.last_result or {}
@@ -274,7 +275,7 @@ def main() -> int:
     saved = {
         "meta": {
             "videoId": video_id, "url": args.url, "model": model,
-            "analyzedAt": datetime.now(timezone.utc).isoformat(), "attempts": res["attempts"], "games": games,
+            "analyzedAt": datetime.now(timezone.utc).isoformat(), "attempts": res["attempts"], "topics": topics,
         },
         "data": res["data"],
     }

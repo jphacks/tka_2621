@@ -81,7 +81,7 @@ def test_no_sugoi_is_warned():
 def test_missing_genre_is_warned():
     d = copy.deepcopy(GOOD)
     d["events"][0]["analogies"] = d["events"][0]["analogies"][:1]
-    assert any("たとえが無いジャンル: fps" in w for w in check_result(d, duration=30).warnings)
+    assert any("たとえが無いジャンル: b" in w for w in check_result(d, duration=30).warnings)
 
 
 def test_gist_length_is_warned_before_it_is_an_error():
@@ -187,7 +187,7 @@ def test_all_attempts_fail_raises_with_last_result():
 
 def test_prompt_contains_key_instructions():
     p = build_prompt()
-    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "gist", "sugoi", "expertWhy", "live", "differs", "rpg", "fps", "context"]:
+    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "gist", "sugoi", "expertWhy", "live", "differs", "ポケットモンスター", "context"]:
         assert k in p, k
 
 
@@ -225,16 +225,17 @@ def test_real_sdk_serializes_request_as_expected(monkeypatch):
 
 def test_validate_api_key():
     assert validate_api_key("AIzaSyA-1234567890abcdefghijklmnopqrstu") is None
+    assert validate_api_key("AQ.Ab8RN6-newer_style_key.123") is None  # AIza で始まらない形式も通す
     assert "英数字以外" in validate_api_key("ここにキー")
     assert "空白" in validate_api_key("AIza abc")
 
 
-def test_prompt_names_the_games_and_bans_grandiose_words():
+def test_prompt_names_the_topics_and_bans_grandiose_words():
     from analyze import build_prompt
     default = build_prompt()
-    assert "ドラゴンクエスト" in default and "Apex Legends" in default and "必殺" in default
-    custom = build_prompt(games={"rpg": "ポケットモンスター", "fps": "Apex"})
-    assert "ポケットモンスター" in custom and "Apex" in custom and "ドラゴンクエスト" not in custom
+    assert "ポケットモンスター" in default and "Apex Legends" in default and "必殺" in default
+    custom = build_prompt(topics={"a": "バスケ", "b": "満員電車"})
+    assert "バスケ" in custom and "満員電車" in custom and "ポケットモンスター" not in custom
 
 
 def test_grandiose_words_are_warned():
