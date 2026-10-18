@@ -42,7 +42,7 @@ def test_bad_sample_is_detected():
     errors = "\n".join(r.errors)
     for pat in ["戻っています", "一致しません", "動画の長さ", "confidence が0〜1の範囲外", "explain が長すぎます",
                 "sugoi なのに expertWhy が空", "sugoi なのに sugoiType が none", "「実際との違い」(differs)がありません",
-                "gist が空です", "gist が長すぎます"]:
+                "gist が空です", "gist が長すぎます", "live(音声で読む実況)が空"]:
         assert pat in errors, pat
     warnings = "\n".join(r.warnings)
     for pat in ["watchPoints は3つ", "basics は最大3つ", "同じです", "見落とし",
@@ -187,7 +187,7 @@ def test_all_attempts_fail_raises_with_last_result():
 
 def test_prompt_contains_key_instructions():
     p = build_prompt()
-    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "gist", "sugoi", "expertWhy", "differs", "rpg", "fps", "context"]:
+    for k in ["MM:SS", "60字以内", "確実に読み取れた", "confidence", "terms", "gist", "sugoi", "expertWhy", "live", "differs", "rpg", "fps", "context"]:
         assert k in p, k
 
 
@@ -227,3 +227,19 @@ def test_validate_api_key():
     assert validate_api_key("AIzaSyA-1234567890abcdefghijklmnopqrstu") is None
     assert "英数字以外" in validate_api_key("ここにキー")
     assert "空白" in validate_api_key("AIza abc")
+
+
+def test_prompt_names_the_games_and_bans_grandiose_words():
+    from analyze import build_prompt
+    default = build_prompt()
+    assert "ドラゴンクエスト" in default and "Apex Legends" in default and "必殺" in default
+    custom = build_prompt(games={"rpg": "ポケットモンスター", "fps": "Apex"})
+    assert "ポケットモンスター" in custom and "Apex" in custom and "ドラゴンクエスト" not in custom
+
+
+def test_grandiose_words_are_warned():
+    import copy
+    d = copy.deepcopy(GOOD)
+    d["events"][0]["analogies"][0]["live"] = "必殺の一撃が通る"
+    r = check_result(d, duration=60, video_id="vid")
+    assert any("大げさな言葉" in w for w in r.warnings)

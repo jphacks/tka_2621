@@ -46,12 +46,14 @@
         {
           "genre": "fps",
           "text": "エントリーでクラッチを決めるような動き。",
-          "differs": ""
+          "differs": "",
+          "live": ""
         },
         {
           "genre": "rpg",
           "text": "オフサイドラインを抜ける勇者の動き。",
-          "differs": "実際は違う。"
+          "differs": "実際は違う。",
+          "live": ""
         }
       ],
       "terms": [],

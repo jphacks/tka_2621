@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 HERE = Path(__file__).parent
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_AUDIO_RE = re.compile(r"^[0-9]{1,6}-[a-z]{2,8}\.wav$")
 SAMPLE_ID = "sample"
 
 
@@ -114,6 +115,13 @@ def make_server(out_dir: Path, sample_dir: Path, host: str = "127.0.0.1", port: 
                     self._json(404, {"error": "見つかりません"})
                 else:
                     self._json(200, saved)
+            elif path.startswith("/api/audio/"):
+                parts = path[len("/api/audio/"):].split("/")
+                f = out_dir / parts[0] / parts[1] if len(parts) == 2 and _ID_RE.match(parts[0]) and _AUDIO_RE.match(parts[1]) else None
+                try:
+                    self._send(200, f.read_bytes(), "audio/wav") if f else self._json(404, {"error": "見つかりません"})
+                except OSError:
+                    self._json(404, {"error": "見つかりません"})
             else:
                 self._json(404, {"error": "見つかりません"})
 

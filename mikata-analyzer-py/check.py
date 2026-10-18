@@ -16,11 +16,12 @@ from pydantic import ValidationError
 from schema import GENRES, Result
 
 LIMITS = {
-    "scene": 50, "gist": 24, "gist_hard": 50, "explain": 60, "explain_hard": 120, "context": 70, "context_hard": 140,
+    "scene": 50, "live": 40, "live_hard": 80, "gist": 24, "gist_hard": 50, "explain": 60, "explain_hard": 120, "context": 70, "context_hard": 140,
     "expertWhy": 100, "expertWhy_hard": 200, "analogy": 90, "analogy_hard": 180, "differs": 60, "differs_hard": 120,
 }
 MAX_SUGOI_RATIO = 0.6  # すごい場面がこれを超えると、何でもすごいと言っている疑い
 # たとえに出てくると、その遊びを知らない人に通じにくい言葉(論文でも指摘された「entry fraggerが分からない」型)
+CHUNI_WORDS = ["必殺", "覚醒", "運命", "宿命", "漆黒", "闇", "勇者", "魔王", "伝説の", "奥義", "禁断", "神速", "覇"]
 GAME_JARGON = [
     "エントリー", "フラガー", "クラッチ", "ピーク", "エイム", "ヘッショ", "スナイプ", "ウルト", "リスポーン",
     "ADS", "キャリー", "ヒーラー", "タンク", "デバフ", "バフ", "アグロ", "ヘイト", "DPS", "ガンク",
@@ -148,6 +149,12 @@ def check_result(data: dict, duration: float | None = None, video_id: str | None
             genres_seen.add(a.genre)
             if not a.text.strip():
                 rep.errors.append(f"{gtag} の text が空です")
+            if not a.live.strip():
+                rep.errors.append(f"{gtag} の live(音声で読む実況)が空です")
+            elif len(a.live) > LIMITS["live_hard"]:
+                rep.errors.append(f"{gtag} の live が長すぎます({len(a.live)}字)")
+            elif len(a.live) > LIMITS["live"]:
+                rep.warnings.append(f"{gtag} の live が{LIMITS['live']}字を超えています({len(a.live)}字)。プレーの間に読み終わらないかもしれません")
             if not a.differs.strip():
                 rep.errors.append(f"{gtag} に「実際との違い」(differs)がありません")
             if len(a.text) > LIMITS["analogy_hard"]:
@@ -158,7 +165,10 @@ def check_result(data: dict, duration: float | None = None, video_id: str | None
                 rep.errors.append(f"{gtag} の differs が長すぎます({len(a.differs)}字)")
             elif len(a.differs) > LIMITS["differs"]:
                 rep.warnings.append(f"{gtag} の differs が{LIMITS['differs']}字を超えています({len(a.differs)}字)")
-            text = f"{a.text}{a.differs}"
+            text = f"{a.text}{a.live}{a.differs}"
+            for w in CHUNI_WORDS:
+                if w in text:
+                    rep.warnings.append(f"{gtag} に大げさな言葉「{w}」があります。ふつうの口調に直してください")
             for w in GAME_JARGON:
                 if w in text:
                     flag(e, f"たとえ({a.genre})に専門用語「{w}」: その遊びを知らない人に通じるか")

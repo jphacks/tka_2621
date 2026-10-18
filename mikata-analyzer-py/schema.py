@@ -11,7 +11,7 @@
   sugoi      玄人が「おっ」と思う場面か
   sugoiType  すごさの種類(蓄積・分類用)
   expertWhy  玄人がなぜすごいと感じるか
-  analogies  ジャンル別のたとえ。text=たとえ / differs=実際との違い(必須)
+  analogies  ジャンル別のたとえ。text=たとえ / live=音声で読む実況の一言二言 / differs=実際との違い(必須)
 """
 from __future__ import annotations
 
@@ -39,8 +39,10 @@ SUGOI_TYPES = {
     "other": "上のどれでもないすごさ",
 }
 
-# たとえに使うジャンル。増やすときはここに足す(表示名はビューア側)
-GENRES = ["rpg", "fps"]
+# たとえに使うゲーム。キー(rpg/fps)はデータ上の区別、値が実際にたとえに使うタイトル。
+# 読み手(初心者)がよく知っているタイトルに変える。analyze.py の --game rpg=タイトル でも変えられる
+DEFAULT_GAMES = {"rpg": "ドラゴンクエスト", "fps": "Apex Legends"}
+GENRES = list(DEFAULT_GAMES)
 
 JSON_SCHEMA: dict = {
     "type": "object",
@@ -108,12 +110,16 @@ JSON_SCHEMA: dict = {
                             "properties": {
                                 "genre": {"type": "string", "enum": GENRES},
                                 "text": {"type": "string", "description": "たとえ(90字以内)"},
+                                "live": {
+                                    "type": "string",
+                                    "description": "音声で読む実況の一言二言(40字以内)。そのジャンルの言葉だけで、いま起きているように現在形で。例(RPG): 敵が前衛に集まった!手薄な後衛へ、一撃が通る!",
+                                },
                                 "differs": {
                                     "type": "string",
                                     "description": "このたとえと実際のサッカーで違うところ(60字以内)",
                                 },
                             },
-                            "required": ["genre", "text", "differs"],
+                            "required": ["genre", "text", "live", "differs"],
                         },
                     },
                     "terms": {
@@ -157,6 +163,7 @@ class Term(_Strict):
 class Analogy(_Strict):
     genre: Literal["rpg", "fps"]
     text: str
+    live: str
     differs: str
 
 

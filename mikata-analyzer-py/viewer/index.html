@@ -185,7 +185,9 @@ const KIND = {
   corner: "コーナーキック", free_kick: "フリーキック", penalty: "PK", card: "カード",
   substitution: "選手交代", pass: "パス", dribble: "ドリブル", tackle: "タックル", other: "その他",
 };
-const GENRE = { rpg: "RPG", fps: "FPS" };
+const DEFAULT_GAMES = { rpg: "ドラゴンクエスト", fps: "Apex Legends" };
+const GENRE = { rpg: "RPG", fps: "FPS" };  // キーの一覧
+const gameName = (g) => ((S.meta && S.meta.games && S.meta.games[g]) || DEFAULT_GAMES[g] || g);
 const LEAD = 0.3;          // 場面の少し手前から出す(秒)
 const SUGOI_LEAD = 3;      // すごい場面は、この秒数前から先出しする
 const GLOW_HOLD = 6;       // すごい場面のあと、光らせ続ける秒数
@@ -247,6 +249,8 @@ async function openVideo(id) {
   if (!res.ok) { showNotice("結果を読み込めませんでした。"); return; }
   const j = await res.json();
   S.meta = j.meta || {};
+  S.vid = id;
+  relabelGenres();
   S.preview = j.data.preview || null;
   S.events = [...j.data.events].sort((a, b) => a.seconds - b.seconds);
   S.duration = Math.max(S.meta.duration || 0, (S.events.at(-1)?.seconds ?? 0) + 8);
@@ -315,6 +319,12 @@ setInterval(() => {
     $("seek").value = S.t;
   }
   if (S.mode === "timer") $("clock").textContent = fmt(S.t) + " / " + fmt(S.duration);
+  // 実況: すごい場面の少し前から、選んだジャンルのたとえを読む
+  if (S.audio && isRunning()) {
+    const e = S.events.find((x) => x.sugoi && !S.spoken.has(x.seconds)
+      && S.t >= x.seconds - LIVE_LEAD && S.t < x.seconds + 2);
+    if (e) { S.spoken.add(e.seconds); playLive(e); }
+  }
   if (view().key !== S.lastKey) render();
 }, 200);
 
@@ -338,16 +348,55 @@ function seekTo(sec) {
   render();
 }
 
-/* ---------- 音声ガイド ---------- */
-function stopSpeech() { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) {} }
+/* ---------- 音声ガイド(実況) ---------- */
+// 選んでいるジャンルの「たとえ」を、実況のように一言二言で読む。プレーの少し前から読み始めて、プレーに重ねる。
+const LIVE_LEAD = 1.0;
+let guide = null, savedVol = null;
+function restoreVol() {
+  try { if (savedVol !== null && S.player && S.player.setVolume) S.player.setVolume(savedVol); } catch (_) {}
+  savedVol = null;
+}
+function stopSpeech() {
+  if (guide) { try { guide.pause(); } catch (_) {} guide = null; }
+  restoreVol();
+  try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) {}
+}
 function speak(text) {
   if (!S.audio || !("speechSynthesis" in window) || !text) return;
   try {
     stopSpeech();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ja-JP"; u.rate = 1.05;
+    u.lang = "ja-JP"; u.rate = 1.15;
     window.speechSynthesis.speak(u);
   } catch (_) {}
+}
+function isRunning() {
+  if (S.mode === "yt" && S.player && S.player.getPlayerState) {
+    try { return S.player.getPlayerState() === 1; } catch (_) { return false; }
+  }
+  return S.mode === "timer" && S.playing;
+}
+/* 事前に作った音声(Gemini TTS)があればそれを流し、無ければブラウザの読み上げにする */
+function playLive(e) {
+  if (!S.audio || S.genre === "none") return;
+  const a = (e.analogies || []).find((x) => x.genre === S.genre);
+  if (!a || !a.live) return;
+  const clip = S.meta && S.meta.audio && S.meta.audio[String(e.seconds)] && S.meta.audio[String(e.seconds)][S.genre];
+  if (!clip || !S.vid) { speak(a.live); return; }
+  stopSpeech();
+  const au = new Audio("/api/audio/" + encodeURIComponent(S.vid) + "/" + encodeURIComponent(clip.file));
+  guide = au;
+  try { // 動画の音を、読み上げの間だけ下げる
+    if (S.mode === "yt" && S.player && S.player.getVolume && S.player.setVolume) {
+      savedVol = S.player.getVolume();
+      S.player.setVolume(Math.round(savedVol * 0.35));
+    }
+  } catch (_) {}
+  const done = () => { if (guide === au) { guide = null; restoreVol(); } };
+  au.addEventListener("ended", done);
+  au.addEventListener("error", () => { done(); speak(a.live); });
+  const p = au.play();
+  if (p && p.catch) p.catch(() => { done(); speak(a.live); });
 }
 
 /* ---------- 描画 ---------- */
@@ -394,8 +443,10 @@ function renderStrip(v) {
 
 function toggleFullscreen() {
   const th = $("theater");
-  if (document.fullscreenElement) document.exitFullscreen();
-  else if (th.requestFullscreen) th.requestFullscreen();
+  try {
+    const done = document.fullscreenElement ? document.exitFullscreen() : (th.requestFullscreen && th.requestFullscreen());
+    if (done && done.catch) done.catch(() => {});
+  } catch (_) { /* 全画面にできなくても、通常表示のまま使える */ }
 }
 
 function renderDetail(v) {
@@ -427,7 +478,7 @@ function renderDetail(v) {
     if (why) box.append(el("div", { class: "block" }, el("p", { class: "lab" }, "経験者がすごいと思う理由"), el("p", {}, why)));
     if (S.genre !== "none") {
       const a = (e.analogies || []).find((x) => x.genre === S.genre);
-      const label = GENRE[S.genre] + "でいうと";
+      const label = gameName(S.genre) + "でいうと";
       box.append(a
         ? el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", {}, a.text), el("p", { class: "differs" }, "ちがうところ: " + a.differs))
         : el("div", { class: "block" }, el("p", { class: "lab" }, label), el("p", { class: "differs" }, "この場面は、うまく置き換えられませんでした。")));
@@ -464,12 +515,8 @@ function render() {
   renderStrip(v);
   renderDetail(v);
   renderLog(v.idx);
-  // 音声ガイド: すごい場面を、先出しの時点で1回だけ読む
   const e = v.focus;
-  if (e && e.sugoi && !S.spoken.has(e.seconds)) {
-    S.spoken.add(e.seconds);
-    speak([e.gist, e.expertWhy].filter(Boolean).join("。"));
-  }
+  S.lastFocus = e ? e.seconds : null;
 }
 
 /* ---------- 場面を探す ---------- */
@@ -509,15 +556,20 @@ function renderHits(q) {
   }
 }
 
+function relabelGenres() { // 動画ごとに、たとえに使ったゲーム名を出す
+  document.querySelectorAll("#genres button").forEach((b) => { if (b.dataset.g !== "none") b.textContent = gameName(b.dataset.g); });
+}
+
 /* ---------- 起動 ---------- */
 async function init() {
   loadYouTubeApi();
   try { const g = localStorage.getItem("genre"); if (g === "none" || GENRE[g]) S.genre = g; } catch (_) {}
   const gbox = $("genres");
   const paintGenres = () => gbox.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.g === S.genre)));
-  for (const [g, label] of [...Object.entries(GENRE), ["none", "たとえなし"]]) {
+  for (const g of [...Object.keys(GENRE), "none"]) {
+    const label = g === "none" ? "たとえなし" : gameName(g);
     gbox.append(el("button", { type: "button", "data-g": g, onclick: () => {
-      S.genre = g; paintGenres(); render();
+      S.genre = g; stopSpeech(); paintGenres(); render();
       try { localStorage.setItem("genre", g); } catch (_) {}
     } }, label));
   }
@@ -542,7 +594,7 @@ async function init() {
   $("seek").addEventListener("input", (ev) => { S.t = Number(ev.target.value); S.spoken.clear(); stopSpeech(); render(); });
   $("q").addEventListener("input", (ev) => renderHits(ev.target.value));
   $("showAll").addEventListener("change", (ev) => { S.showAll = ev.target.checked; render(); });
-  document.addEventListener("fullscreenchange", render);
+  document.addEventListener("fullscreenchange", () => setTimeout(render, 150)); // 画面サイズが落ち着いてから描き直す
 
   const res = await fetch("/api/videos");
   const vids = res.ok ? await res.json() : [];

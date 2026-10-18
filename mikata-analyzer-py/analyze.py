@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from check import Report, check_result, format_report
-from schema import JSON_SCHEMA
+from schema import DEFAULT_GAMES, JSON_SCHEMA
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 
@@ -44,7 +44,24 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"YouTubeの動画IDを取り出せません: {url}")
 
 
-def build_prompt(feedback: str = "") -> str:
+def analogy_rules(games: dict) -> str:
+    names = "、".join(f"{g}={t}" for g, t in games.items())
+    example = ("(例 ドラゴンクエスト: 敵が前に集まってる、その間に後ろの仲間へバイキルト / 例 Apex Legends: 敵が全員同じ建物に集まった、がら空きの反対側から回り込む)。"
+               if games == DEFAULT_GAMES else "")
+    return f"""【たとえ(analogies)】
+- sugoi が true の場面には、次のゲームそれぞれで、たとえを1つずつ書く(genre には左のキーを入れる): {names}。sugoi が false なら空配列。
+- 読み手は、そのゲームを普通に遊んだことがあります。そのゲームに**実際にある**場面・操作・仕組み・場所の名前で、具体的に書く。ゲーム名は文章に入れなくてよい(画面の見出しに出る)。
+- たとえは、「経験者がすごいと感じる構造」をそのゲームの場面に置き換える。表面的な似方ではなく、何が難しいか・何を可能にしたかの構造を合わせる。
+- 大げさな言葉・詩的な言い回し・造語は使わない(「必殺」「覚醒」「運命」「闇」「勇者」「伝説の」など)。友達に「あれ、〇〇でいうとさ」と話すときの、ふつうの口調で書く。
+- 構造がうまく合わないときは、無理にたとえず、そのゲームは省く。
+- サッカーの用語や選手名は、たとえの中に入れない。
+- differs には、そのたとえと実際のサッカーで違うところを、必ず60字以内で書く。
+- text は90字以内。
+- live: 音声で読む、そのゲームの**実況の一言二言**を40字以内で書く。たとえ(text)の要約ではなく、いまプレーが起きているのを、そのゲームの実際の場面に置き換えて実況する。ふつうの話し言葉で、感嘆符は多くて1つ。{example}ひとつの場面を2文以内に収め、聞いて3秒で終わる長さにする。"""
+
+
+def build_prompt(feedback: str = "", games: dict | None = None) -> str:
+    games = games or DEFAULT_GAMES
     prompt = """あなたは、サッカーに詳しい経験者です。サッカーのルールをまったく知らない友人と、隣に座って一緒にこの動画を見ています。
 経験者が「おっ、すごい!」と感じる場面で、友人も同じ熱量で盛り上がれるように、場面ごとの解説を指定のJSONで作ってください。
 
@@ -66,13 +83,7 @@ def build_prompt(feedback: str = "") -> str:
 - sugoiType は、すごさの種類を選ぶ。sugoi が false なら none。
 - expertWhy: 経験者がなぜすごいと感じるかを、100字以内で書く。「上手い」「すごい」だけで終わらず、何が難しいか・何を防いだか・何を可能にしたかを書く。sugoi が false なら空文字。
 
-【たとえ(analogies)】
-- sugoi が true の場面には、ジャンル rpg と fps の両方で、たとえを1つずつ書く。sugoi が false なら空配列。
-- たとえは、「経験者がすごいと感じる構造」をそのままゲームの場面に置き換える。表面的な似方(「ボールを蹴る=攻撃魔法」など)ではなく、何が難しいか・何を可能にしたかの構造を合わせる。
-- そのゲームを知らない人にも通じるよう、ゲーム内の専門用語(例: エントリー、クラッチ、ヘイト)は使わない。サッカーの用語も、たとえの中には使わない。
-- 構造がうまく合わないときは、無理にたとえず、そのジャンルは省く。
-- differs には、そのたとえと実際のサッカーで違うところを、必ず60字以内で書く。
-- text は90字以内。
+{ANALOGY_RULES}
 
 【その他】
 - terms: explain と context に出てくるサッカー用語(例: オフサイド、クロス)と、一言の説明。
@@ -82,6 +93,7 @@ def build_prompt(feedback: str = "") -> str:
 - preview.basics: この動画を理解するのに必要な前提ルールを最大3つ。
 - すべて日本語で書く。
 """
+    prompt = prompt.replace("{ANALOGY_RULES}", analogy_rules(games))
     if feedback:
         prompt += f"\n【前回の出力の問題】\n{feedback}\n上の問題を直して、JSON全体を出し直してください。\n"
     return prompt
@@ -106,6 +118,7 @@ def analyze_video(
     max_retries: int = 3,
     log=lambda _msg: None,
     backoff_s: float = 2.0,
+    games: dict | None = None,
 ) -> dict:
     """成功すると {video_id, data, report, attempts} を返す。失敗すると AnalysisFailed。"""
     video_id = extract_video_id(url)
@@ -121,7 +134,7 @@ def analyze_video(
             interaction = client.interactions.create(
                 model=model,
                 # 公式ガイドに合わせて、動画パートの後にテキストを置く
-                input=[video_part, {"type": "text", "text": build_prompt(feedback)}],
+                input=[video_part, {"type": "text", "text": build_prompt(feedback, games)}],
                 response_format={"type": "text", "mime_type": "application/json", "schema": JSON_SCHEMA},
             )
             text = interaction.output_text
@@ -185,9 +198,19 @@ def main() -> int:
     ap.add_argument("--end", type=float, help="解析する区間の終了(秒)。未検証の組み合わせ")
     ap.add_argument("--fps", type=float, help="1秒あたりのフレーム数。未検証の組み合わせ")
     ap.add_argument("--force", action="store_true", help="保存済みでも解析し直す")
+    ap.add_argument("--game", action="append", metavar="キー=タイトル",
+                    help="たとえに使うゲームを変える(例: --game rpg=ポケットモンスター --game fps=Apex)。キーは rpg / fps")
+    ap.add_argument("--tts", action="store_true", help="解析のあと、続けて読み上げ音声も作る(tts.py と同じ)")
     args = ap.parse_args()
 
     env_path = _load_dotenv()
+    games = dict(DEFAULT_GAMES)
+    for item in args.game or []:
+        key, _, title = item.partition("=")
+        if key not in games or not title.strip():
+            print(f"--game は キー=タイトル の形で、キーは {' / '.join(games)} のどれかです: {item}", file=sys.stderr)
+            return 2
+        games[key] = title.strip()
     try:
         video_id = extract_video_id(args.url)
     except ValueError as err:
@@ -228,12 +251,12 @@ def main() -> int:
 
     model = args.model or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
     print(f"読み込んだ .env: {env_path or '(なし)'}  キーの長さ: {len(api_key)}文字")
-    print(f"解析開始: {args.url}\nモデル: {model}" + (f"\n区間/fps: {json.dumps(processing)}" if processing else ""))
+    print(f"解析開始: {args.url}\nモデル: {model}\nたとえのゲーム: {games}" + (f"\n区間/fps: {json.dumps(processing)}" if processing else ""))
 
     try:
         res = analyze_video(
             client, args.url, model=model, processing=processing,
-            duration=args.duration, max_retries=args.retries, log=lambda m: print(f"  {m}"),
+            duration=args.duration, max_retries=args.retries, log=lambda m: print(f"  {m}"), games=games,
         )
     except AnalysisFailed as err:
         last = err.last_result or {}
@@ -251,7 +274,7 @@ def main() -> int:
     saved = {
         "meta": {
             "videoId": video_id, "url": args.url, "model": model,
-            "analyzedAt": datetime.now(timezone.utc).isoformat(), "attempts": res["attempts"],
+            "analyzedAt": datetime.now(timezone.utc).isoformat(), "attempts": res["attempts"], "games": games,
         },
         "data": res["data"],
     }
@@ -259,6 +282,15 @@ def main() -> int:
     (out_dir / f"{video_id}.report.txt").write_text(format_report(res["report"]), encoding="utf-8")
     print(f"\n保存しました: {out_file}\n")
     print(format_report(res["report"]))
+    if args.tts:
+        import tts
+        print("\n読み上げ音声を作ります ...")
+        try:
+            saved = tts.generate(client, saved, out_dir / video_id)
+            out_file.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as err:  # noqa: BLE001
+            print(f"音声の作成に失敗しました(解析結果は保存済み。あとで python tts.py {video_id} で作れます): {err}", file=sys.stderr)
+            return 1
     return 0
 
 
